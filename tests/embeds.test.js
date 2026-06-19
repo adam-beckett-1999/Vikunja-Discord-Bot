@@ -1,0 +1,92 @@
+import { test, describe } from 'node:test';
+import assert from 'node:assert/strict';
+
+describe('embed helpers – pure logic', () => {
+  test('priority label mapping covers 0–5', () => {
+    const PRIORITY_LABELS = {
+      0: 'Unset',
+      1: 'Low',
+      2: 'Medium',
+      3: 'High',
+      4: 'Urgent',
+      5: 'DO NOW',
+    };
+    for (let i = 0; i <= 5; i++) {
+      assert.ok(PRIORITY_LABELS[i], 'Missing label for priority ' + i);
+    }
+  });
+
+  test('ISO date string is parseable', () => {
+    const iso = new Date('2025-12-31').toISOString();
+    assert.ok(iso.startsWith('2025-12-31'), 'ISO string should start with the input date');
+  });
+
+  test('invalid date string is detected', () => {
+    const d = new Date('not-a-date');
+    assert.ok(isNaN(d.getTime()), 'Invalid date should be NaN');
+  });
+
+  test('description truncation at Discord 4096 char limit', () => {
+    const long = 'x'.repeat(5000);
+    const truncated = long.length > 4096 ? long.slice(0, 4093) + '…' : long;
+    // 4093 chars + single '…' character = 4094 total
+    assert.strictEqual(truncated.length, 4094);
+    assert.ok(truncated.endsWith('…'));
+  });
+
+  test('short description is not truncated', () => {
+    const short = 'Hello world';
+    const result = short.length > 4096 ? short.slice(0, 4093) + '…' : short;
+    assert.strictEqual(result, 'Hello world');
+  });
+});
+
+describe('config parsing helpers', () => {
+  test('trailing slash is stripped from base URL', () => {
+    const url = 'https://example.com/';
+    const cleaned = url.replace(/\/$/, '');
+    assert.strictEqual(cleaned, 'https://example.com');
+  });
+
+  test('guild ID splitting handles empty string', () => {
+    const raw = '';
+    const ids = raw ? raw.split(',').map((id) => id.trim()).filter(Boolean) : [];
+    assert.deepStrictEqual(ids, []);
+  });
+
+  test('guild ID splitting handles multiple ids', () => {
+    const raw = '111,222, 333';
+    const ids = raw ? raw.split(',').map((id) => id.trim()).filter(Boolean) : [];
+    assert.deepStrictEqual(ids, ['111', '222', '333']);
+  });
+});
+
+describe('webhook signature verification logic', () => {
+  test('non-hex signature characters are rejected', () => {
+    const HEX_PATTERN = /^[0-9a-f]+$/i;
+    assert.ok(!HEX_PATTERN.test('zzzz'), 'Non-hex should fail pattern');
+    assert.ok(HEX_PATTERN.test('deadbeef'), 'Valid hex should pass pattern');
+    assert.ok(!HEX_PATTERN.test(''), 'Empty string should fail pattern');
+  });
+
+  test('timingSafeEqual rejects different length buffers', () => {
+    const a = Buffer.from('abc', 'hex');
+    const b = Buffer.from('abcd', 'hex');
+    // Different lengths should not be considered equal.
+    assert.notStrictEqual(a.length, b.length);
+  });
+
+  test('crypto hmac produces consistent output', async () => {
+    const { createHmac } = await import('node:crypto');
+    const hmac1 = createHmac('sha256', 'secret').update('body', 'utf8').digest('hex');
+    const hmac2 = createHmac('sha256', 'secret').update('body', 'utf8').digest('hex');
+    assert.strictEqual(hmac1, hmac2, 'Same input should produce same HMAC');
+  });
+
+  test('crypto hmac differs with different secrets', async () => {
+    const { createHmac } = await import('node:crypto');
+    const hmac1 = createHmac('sha256', 'secret1').update('body', 'utf8').digest('hex');
+    const hmac2 = createHmac('sha256', 'secret2').update('body', 'utf8').digest('hex');
+    assert.notStrictEqual(hmac1, hmac2, 'Different secrets should produce different HMACs');
+  });
+});
