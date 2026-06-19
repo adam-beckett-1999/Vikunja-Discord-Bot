@@ -4,6 +4,18 @@ function normalize(value) {
   return String(value ?? '').trim().toLowerCase();
 }
 
+function extractTrailingId(value) {
+  const raw = String(value ?? '').trim();
+  if (!raw) return null;
+
+  // Accept either plain numeric input ("123") or label formats like
+  // "Project Name (#123)" and "Task Name #123".
+  if (/^\d+$/.test(raw)) return raw;
+
+  const match = raw.match(/#(\d+)\)?\s*$/);
+  return match ? match[1] : null;
+}
+
 function isNumericSelection(value) {
   return /^\d+$/.test(String(value ?? '').trim());
 }
@@ -46,6 +58,11 @@ export async function resolveProjectSelection(selection) {
   const res = await getAllProjects();
   const projects = Array.isArray(res.data) ? res.data : [];
 
+  const extractedId = extractTrailingId(raw);
+  if (extractedId) {
+    return projects.find((project) => String(project.id) === extractedId) ?? null;
+  }
+
   if (isNumericSelection(raw)) {
     return projects.find((project) => String(project.id) === raw) ?? null;
   }
@@ -76,6 +93,16 @@ export async function autocompleteTasks(projectId, query) {
 export async function resolveTaskSelection(projectId, selection) {
   const raw = String(selection ?? '').trim();
   if (!projectId || !raw) return null;
+
+  const extractedId = extractTrailingId(raw);
+  if (extractedId) {
+    try {
+      const task = await getTask(Number(extractedId));
+      return String(task.data?.project_id ?? '') === String(projectId) ? task.data : null;
+    } catch {
+      return null;
+    }
+  }
 
   if (isNumericSelection(raw)) {
     try {
