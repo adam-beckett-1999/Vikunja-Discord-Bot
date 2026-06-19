@@ -168,6 +168,17 @@ This repository includes a GitHub Actions workflow at:
 
 `.github/workflows/docker-build-push-dev.yml`
 
+It also includes a release workflow at:
+
+`.github/workflows/docker-build-push-release.yml`
+
+### Branch to tag mapping
+
+| Branch | Workflow | Published tags |
+|---|---|---|
+| `initial-dev` | `docker-build-push-dev.yml` | `dev`, `sha-<commit>` |
+| `release` | `docker-build-push-release.yml` | `latest`, `sha-<commit>` |
+
 The workflow runs on pushes to `initial-dev` (and manual runs), builds the Docker image, and publishes to Docker Hub with:
 
 - `DOCKERHUB_USERNAME/vikunja-discord-bot:dev`
