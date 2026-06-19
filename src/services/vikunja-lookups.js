@@ -1,5 +1,7 @@
 import { getAllProjects, getAllTasks, getTask, getTasksByProject } from './vikunja.js';
 
+const MAX_CHOICE_NAME_LENGTH = 100;
+
 function normalize(value) {
   return String(value ?? '').trim().toLowerCase();
 }
@@ -26,9 +28,27 @@ function isNumericSelection(value) {
 
 function toChoices(items, labelFn) {
   return items.slice(0, 25).map((item) => ({
-    name: labelFn(item),
+    name: formatChoiceName(labelFn(item), item.id),
     value: String(item.id),
   }));
+}
+
+function formatChoiceName(label, id) {
+  const safeLabel = String(label ?? '').trim() || 'Untitled';
+  const suffix = ' (#' + id + ')';
+  const maxLabelLength = MAX_CHOICE_NAME_LENGTH - suffix.length;
+
+  if (maxLabelLength <= 1) {
+    return String(id).slice(0, MAX_CHOICE_NAME_LENGTH);
+  }
+
+  if (safeLabel.length <= maxLabelLength) {
+    return safeLabel + suffix;
+  }
+
+  // Keep the ID suffix while shortening long titles to satisfy Discord's 100-char limit.
+  const truncated = safeLabel.slice(0, maxLabelLength - 1).trimEnd() + '…';
+  return truncated + suffix;
 }
 
 function findExactMatch(items, selection, labelFn) {
@@ -52,7 +72,7 @@ export async function autocompleteProjects(query) {
     return normalize(project.title).includes(needle);
   });
 
-  return toChoices(matches, (project) => project.title + ' (#' + project.id + ')');
+  return toChoices(matches, (project) => project.title);
 }
 
 export async function resolveProjectSelection(selection) {
@@ -102,7 +122,7 @@ export async function autocompleteTasks(projectId, query) {
     return normalize(task.title).includes(needle);
   });
 
-  return toChoices(matches, (task) => task.title + ' (#' + task.id + ')');
+  return toChoices(matches, (task) => task.title);
 }
 
 export async function resolveTaskSelection(projectId, selection) {
