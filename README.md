@@ -196,4 +196,4 @@ The workflow runs on pushes to `initial-dev` (and manual runs), builds the Docke
 
 ## License
 
-ISC
+MIT
