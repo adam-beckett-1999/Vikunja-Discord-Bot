@@ -9,6 +9,22 @@ export const once = false;
  * @param {import('discord.js').Collection<string, {data: object, execute: Function}>} commands
  */
 export async function execute(interaction, commands) {
+  if (interaction.isAutocomplete()) {
+    const command = commands.get(interaction.commandName);
+    if (!command?.autocomplete) {
+      await interaction.respond([]).catch(() => {});
+      return;
+    }
+
+    try {
+      await command.autocomplete(interaction);
+    } catch (err) {
+      console.error('[Interaction] Error handling autocomplete for ' + interaction.commandName, err);
+      await interaction.respond([]).catch(() => {});
+    }
+    return;
+  }
+
   if (!interaction.isChatInputCommand()) return;
 
   const command = commands.get(interaction.commandName);

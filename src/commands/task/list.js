@@ -1,13 +1,15 @@
 import { SlashCommandBuilder } from 'discord.js';
 import { getAllTasks, getTasksByProject } from '../../services/vikunja.js';
+import { autocompleteProjects, resolveProjectSelection } from '../../services/vikunja-lookups.js';
 import { buildTaskListEmbed, buildErrorEmbed } from '../../utils/embeds.js';
 
 export const data = new SlashCommandBuilder()
   .setName('task-list')
   .setDescription('List Vikunja tasks, optionally filtered to a project')
-  .addIntegerOption((opt) =>
+  .addStringOption((opt) =>
     opt.setName('project')
-      .setDescription('Project ID to filter by (leave empty for all tasks)')
+      .setDescription('Project to filter by (leave empty for all tasks)')
+      .setAutocomplete(true)
   )
   .addStringOption((opt) =>
     opt.setName('search')
@@ -25,7 +27,7 @@ export const data = new SlashCommandBuilder()
 export async function execute(interaction) {
   await interaction.deferReply();
 
-  const projectId = interaction.options.getInteger('project');
+  const projectSelection = interaction.options.getString('project');
   const search = interaction.options.getString('search') ?? undefined;
   const page = interaction.options.getInteger('page') ?? 1;
 
@@ -35,9 +37,17 @@ export async function execute(interaction) {
   try {
     let res;
     let title;
-    if (projectId) {
-      res = await getTasksByProject(projectId, params);
-      title = 'Tasks in Project ' + projectId;
+    if (projectSelection) {
+      const project = await resolveProjectSelection(projectSelection);
+      if (!project) {
+        await interaction.editReply({
+          embeds: [buildErrorEmbed('Could not find a project matching `' + projectSelection + '`.')],
+        });
+        return;
+      }
+
+      res = await getTasksByProject(project.id, params);
+      title = 'Tasks in ' + project.title;
     } else {
       res = await getAllTasks(params);
       title = 'All Tasks';
@@ -49,4 +59,12 @@ export async function execute(interaction) {
     const msg = err.response?.data?.message ?? err.message;
     await interaction.editReply({ embeds: [buildErrorEmbed('Failed to list tasks: ' + msg)] });
   }
+}
+
+export async function autocomplete(interaction) {
+  const focused = interaction.options.getFocused(true);
+  if (focused.name !== 'project') return interaction.respond([]);
+
+  const choices = await autocompleteProjects(focused.value);
+  await interaction.respond(choices);
 }
