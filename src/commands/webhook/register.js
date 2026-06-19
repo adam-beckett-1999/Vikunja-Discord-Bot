@@ -1,14 +1,16 @@
 import { SlashCommandBuilder } from 'discord.js';
 import { createWebhook } from '../../services/vikunja.js';
+import { autocompleteProjects, resolveProjectSelection } from '../../services/vikunja-lookups.js';
 import { buildErrorEmbed, buildSuccessEmbed } from '../../utils/embeds.js';
 
 export const data = new SlashCommandBuilder()
   .setName('webhook-register')
   .setDescription('Register a Vikunja webhook for a project to send notifications here')
-  .addIntegerOption((opt) =>
+  .addStringOption((opt) =>
     opt.setName('project')
-      .setDescription('Project ID to register the webhook on')
+      .setDescription('Project to register the webhook on')
       .setRequired(true)
+      .setAutocomplete(true)
   )
   .addStringOption((opt) =>
     opt.setName('url')
@@ -22,15 +24,23 @@ export const data = new SlashCommandBuilder()
 export async function execute(interaction) {
   await interaction.deferReply({ ephemeral: true });
 
-  const projectId = interaction.options.getInteger('project', true);
+  const projectSelection = interaction.options.getString('project', true);
   const targetUrl = interaction.options.getString('url', true);
 
+  const project = await resolveProjectSelection(projectSelection);
+  if (!project) {
+    await interaction.editReply({
+      embeds: [buildErrorEmbed('Could not find a project matching `' + projectSelection + '`.')],
+    });
+    return;
+  }
+
   try {
-    const res = await createWebhook(projectId, targetUrl);
+    const res = await createWebhook(project.id, targetUrl);
     await interaction.editReply({
       embeds: [
         buildSuccessEmbed(
-          'Webhook `' + res.data.id + '` registered on project `' + projectId + '`.\n' +
+          'Webhook `' + res.data.id + '` registered on project `' + project.title + '`.\n' +
           'Vikunja will now POST task events to `' + targetUrl + '`.'
         ),
       ],
@@ -41,4 +51,12 @@ export async function execute(interaction) {
       embeds: [buildErrorEmbed('Failed to register webhook: ' + msg)],
     });
   }
+}
+
+export async function autocomplete(interaction) {
+  const focused = interaction.options.getFocused(true);
+  if (focused.name !== 'project') return interaction.respond([]);
+
+  const choices = await autocompleteProjects(focused.value);
+  await interaction.respond(choices);
 }
