@@ -1,5 +1,7 @@
 import { EmbedBuilder } from 'discord.js';
 
+const MAX_EMBED_DESCRIPTION_LENGTH = 4096;
+
 /** Priority label map matching Vikunja's values (0–5). */
 const PRIORITY_LABELS = {
   0: 'Unset',
@@ -37,10 +39,11 @@ export function buildTaskEmbed(task, action) {
     .setFooter({ text: 'Task ID: ' + task.id });
 
   if (task.description) {
+    const formatted = formatTaskDescription(task.description);
     // Truncate long descriptions to Discord's 4096 character limit for embed descriptions.
-    const description = task.description.length > 4096
-      ? task.description.slice(0, 4093) + '…'
-      : task.description;
+    const description = formatted.length > MAX_EMBED_DESCRIPTION_LENGTH
+      ? formatted.slice(0, MAX_EMBED_DESCRIPTION_LENGTH - 1).trimEnd() + '…'
+      : formatted;
     embed.setDescription(description);
   }
 
@@ -64,6 +67,51 @@ export function buildTaskEmbed(task, action) {
   embed.setTimestamp(task.updated ? new Date(task.updated) : new Date());
 
   return embed;
+}
+
+function decodeHtmlEntities(input) {
+  return input
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/&#x27;/gi, "'")
+    .replace(/&#x2F;/gi, '/')
+    .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code)));
+}
+
+export function formatTaskDescription(description) {
+  let text = String(description ?? '');
+
+  text = decodeHtmlEntities(text);
+
+  // Preserve task checklist semantics where Vikunja encodes done state on <li>.
+  text = text
+    .replace(/<li[^>]*data-checked\s*=\s*"true"[^>]*>/gi, '\n- [x] ')
+    .replace(/<li[^>]*data-checked\s*=\s*"false"[^>]*>/gi, '\n- [ ] ')
+    .replace(/<li[^>]*>/gi, '\n- ');
+
+  text = text
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p>/gi, '\n')
+    .replace(/<\/div>/gi, '\n')
+    .replace(/<\/ul>/gi, '\n')
+    .replace(/<\/ol>/gi, '\n');
+
+  // Drop remaining markup after preserving structure above.
+  text = text.replace(/<[^>]+>/g, '');
+
+  // Clean up line noise and spacing while preserving paragraph separation.
+  text = text
+    .split('\n')
+    .map((line) => line.replace(/\s+/g, ' ').trimEnd())
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+
+  return text || 'No description.';
 }
 
 /**

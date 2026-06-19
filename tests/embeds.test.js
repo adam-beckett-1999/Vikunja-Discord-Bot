@@ -1,5 +1,6 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
+import { formatTaskDescription } from '../src/utils/embeds.js';
 
 describe('embed helpers – pure logic', () => {
   test('priority label mapping covers 0–5', () => {
@@ -38,6 +39,17 @@ describe('embed helpers – pure logic', () => {
     const short = 'Hello world';
     const result = short.length > 4096 ? short.slice(0, 4093) + '…' : short;
     assert.strictEqual(result, 'Hello world');
+  });
+
+  test('html checklist description is converted to readable text', () => {
+    const input = '<p>Header</p><ul><li data-checked="true"><label><input type="checkbox" checked="checked"></label><div><p>First item</p></div></li><li data-checked="false"><div><p>Second item</p></div></li></ul>';
+    const formatted = formatTaskDescription(input);
+
+    assert.ok(formatted.includes('Header'));
+    assert.ok(formatted.includes('- [x] First item'));
+    assert.ok(formatted.includes('- [ ] Second item'));
+    assert.ok(!formatted.includes('<li'));
+    assert.ok(!formatted.includes('<input'));
   });
 });
 
