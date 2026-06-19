@@ -144,6 +144,45 @@ npm test
 
 ---
 
+## Docker
+
+### Build image locally
+
+```bash
+docker build -t vikunja-discord-bot:dev .
+```
+
+### Run container locally
+
+```bash
+docker run --rm -p 3000:3000 --env-file .env vikunja-discord-bot:dev
+```
+
+The container exposes port `3000` and starts the bot with `npm start`.
+
+---
+
+## CI: Docker Hub Publish
+
+This repository includes a GitHub Actions workflow at:
+
+`.github/workflows/docker-build-push-dev.yml`
+
+The workflow runs on pushes to `initial-dev` (and manual runs), builds the Docker image, and publishes to Docker Hub with:
+
+- `DOCKERHUB_USERNAME/vikunja-discord-bot:dev`
+- `DOCKERHUB_USERNAME/vikunja-discord-bot:sha-<commit>`
+
+### Required repository secrets
+
+| Secret | Required | Description |
+|---|---|---|
+| `DOCKERHUB_USERNAME` | ✅ | Your Docker Hub username |
+| `DOCKERHUB_TOKEN` | ✅ | Docker Hub access token with push permissions |
+| `DISCORD_WEBHOOK_URL` | ⬜ | Optional webhook for success/failure workflow notifications |
+
+---
+
 ## License
 
 ISC
