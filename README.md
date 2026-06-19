@@ -158,7 +158,8 @@ docker build -t vikunja-discord-bot:dev .
 docker run --rm -p 3000:3000 --env-file .env vikunja-discord-bot:dev
 ```
 
-The container exposes port `3000` and starts the bot with `npm start`.
+The container exposes port `3000`, deploys slash commands on startup, and then starts the bot.
+Make sure `DISCORD_TOKEN`, `DISCORD_CLIENT_ID`, and `DISCORD_GUILD_IDS` are set in the container environment so command registration can succeed.
 
 ---
 

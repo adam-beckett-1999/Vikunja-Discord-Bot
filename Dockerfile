@@ -15,4 +15,4 @@ EXPOSE 3000
 # Run as the non-root node user provided by the base image.
 USER node
 
-CMD ["npm", "start"]
+CMD ["npm", "run", "start:docker"]
