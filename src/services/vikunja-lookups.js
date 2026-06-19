@@ -1,4 +1,4 @@
-import { getAllProjects, getTask, getTasksByProject } from './vikunja.js';
+import { getAllProjects, getAllTasks, getTask, getTasksByProject } from './vikunja.js';
 
 function normalize(value) {
   return String(value ?? '').trim().toLowerCase();
@@ -14,6 +14,10 @@ function extractTrailingId(value) {
 
   const match = raw.match(/#(\d+)\)?\s*$/);
   return match ? match[1] : null;
+}
+
+export function parseSelectionId(value) {
+  return extractTrailingId(value);
 }
 
 function isNumericSelection(value) {
@@ -74,12 +78,23 @@ export async function resolveProjectSelection(selection) {
 export async function autocompleteTasks(projectId, query) {
   if (!projectId) return [];
 
-  const res = await getTasksByProject(projectId, {
+  const params = {
     page: 1,
-    per_page: 25,
+    per_page: 100,
     s: query || undefined,
-  });
-  const tasks = Array.isArray(res.data) ? res.data : [];
+  };
+
+  const res = await getTasksByProject(projectId, params);
+  let tasks = Array.isArray(res.data) ? res.data : [];
+
+  // Some Vikunja setups return a non-array payload for project-task routes.
+  // Fall back to all-task search and filter by project id in that case.
+  if (!tasks.length) {
+    const allRes = await getAllTasks(params);
+    const allTasks = Array.isArray(allRes.data) ? allRes.data : [];
+    tasks = allTasks.filter((task) => String(task.project_id) === String(projectId));
+  }
+
   const needle = normalize(query);
 
   const matches = tasks.filter((task) => {

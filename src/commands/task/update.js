@@ -3,6 +3,7 @@ import { updateTask } from '../../services/vikunja.js';
 import {
   autocompleteProjects,
   autocompleteTasks,
+  parseSelectionId,
   resolveProjectSelection,
   resolveTaskSelection,
 } from '../../services/vikunja-lookups.js';
@@ -125,13 +126,13 @@ export async function autocomplete(interaction) {
       return;
     }
 
-    const project = await resolveProjectSelection(projectSelection);
-    if (!project) {
+    const projectId = parseSelectionId(projectSelection);
+    if (!projectId) {
       await interaction.respond([]);
       return;
     }
 
-    const choices = await autocompleteTasks(project.id, focused.value);
+    const choices = await autocompleteTasks(projectId, focused.value);
     await interaction.respond(choices);
   }
 }
