@@ -117,10 +117,16 @@ export async function deleteTask(taskId) {
  * @param {string[]} [events] - Defaults to all task events
  */
 export async function createWebhook(projectId, targetUrl, events) {
-  return vikunjaClient.put('/projects/' + projectId + '/webhooks', {
+  const payload = {
     target_url: targetUrl,
     events: events ?? ['task.created', 'task.updated', 'task.deleted'],
-  });
+  };
+
+  if (config.webhook.secret) {
+    payload.secret = config.webhook.secret;
+  }
+
+  return vikunjaClient.put('/projects/' + projectId + '/webhooks', payload);
 }
 
 /**

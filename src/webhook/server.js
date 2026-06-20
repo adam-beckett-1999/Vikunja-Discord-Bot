@@ -60,7 +60,10 @@ export function startWebhookServer(discordClient) {
     const signature = req.headers['x-vikunja-signature'];
 
     if (!isSignatureValid(rawBody, signature)) {
-      console.warn('[Webhook] Rejected request: invalid signature');
+      console.warn('[Webhook] Rejected request: invalid signature', {
+        secretConfigured: Boolean(config.webhook.secret),
+        signaturePresent: Boolean(signature),
+      });
       return res.status(401).json({ error: 'Invalid signature' });
     }
 
@@ -73,8 +76,11 @@ export function startWebhookServer(discordClient) {
 
     const eventType = payload.event_type ?? payload.type;
 
+    console.log('[Webhook] Received event: ' + (eventType ?? 'unknown'));
+
     if (!SUPPORTED_EVENTS.has(eventType)) {
       // Acknowledge but don't act on unknown events.
+      console.warn('[Webhook] Ignored unsupported event: ' + (eventType ?? 'unknown'));
       return res.status(200).json({ status: 'ignored', event: eventType });
     }
 
