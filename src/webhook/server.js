@@ -2,6 +2,7 @@ import express from 'express';
 import crypto from 'node:crypto';
 import config from '../config.js';
 import { buildTaskEmbed } from '../utils/embeds.js';
+import { getTaskUpdateHighlightFromPayload } from '../utils/task-update-highlight.js';
 import { EmbedBuilder } from 'discord.js';
 
 /**
@@ -12,8 +13,6 @@ const EVENT_ACTION = {
   'task.updated': 'Updated',
   'task.deleted': 'Deleted',
 };
-
-const MAX_UPDATED_FIELD_VALUE_LENGTH = 120;
 
 /**
  * Resolve the webhook event type from the Vikunja payload.
@@ -171,76 +170,7 @@ function getEventActionLabel(eventType) {
 }
 
 export function getTaskUpdateHighlight(eventType, payload, task) {
-  if (eventType !== 'task.updated' || !task) return null;
-
-  const oldTask = payload?.data?.old_task
-    ?? payload?.old_task
-    ?? payload?.data?.oldTask
-    ?? payload?.oldTask;
-
-  if (!oldTask || typeof oldTask !== 'object') return null;
-
-  const fields = [
-    'title',
-    'description',
-    'done',
-    'priority',
-    'due_date',
-    'start_date',
-    'end_date',
-    'project_id',
-  ];
-
-  for (const field of fields) {
-    if (!Object.hasOwn(oldTask, field) || !Object.hasOwn(task, field)) {
-      continue;
-    }
-    if (!areEqualForDisplay(oldTask[field], task[field])) {
-      return {
-        field: formatFieldName(field),
-        before: formatFieldValue(oldTask[field]),
-        after: formatFieldValue(task[field]),
-      };
-    }
-  }
-
-  return null;
-}
-
-function formatFieldName(field) {
-  return field
-    .replace(/_/g, ' ')
-    .split(' ')
-    .filter(Boolean)
-    .map((token) => token.charAt(0).toUpperCase() + token.slice(1))
-    .join(' ');
-}
-
-function areEqualForDisplay(a, b) {
-  return formatComparableValue(a) === formatComparableValue(b);
-}
-
-function formatComparableValue(value) {
-  if (value === undefined || value === null) return '';
-  if (typeof value === 'string') return value.trim();
-  if (value instanceof Date) return value.toISOString();
-  return JSON.stringify(value);
-}
-
-function formatFieldValue(value) {
-  if (value === undefined || value === null || value === '') return 'empty';
-  if (typeof value === 'boolean') return value ? 'true' : 'false';
-  if (typeof value === 'string') {
-    const escaped = escapeDiscordMarkdown(value);
-    return escaped.length > MAX_UPDATED_FIELD_VALUE_LENGTH
-      ? escaped.slice(0, MAX_UPDATED_FIELD_VALUE_LENGTH - 1).trimEnd() + '…'
-      : escaped;
-  }
-  return String(value);
-}
-
-function escapeDiscordMarkdown(value) {
-  return value.replace(/[\\`*_~|]/g, '\\$&');
+  return getTaskUpdateHighlightFromPayload(eventType, payload, task);
 }
 
 /**
