@@ -95,6 +95,7 @@ The `events` option is optional and free-text. If omitted, the default lifecycle
 When provided, enter a comma-separated list of event names.
 The field supports long values (up to 1000 characters), so you can include many event names in one command.
 If the selected event list is larger than the per-webhook event limit enforced by Vikunja, the bot automatically creates multiple webhooks (in batches of 5 events) for the same project and URL.
+If some event names are unsupported by your Vikunja version, the bot registers the supported ones and reports skipped events in the command response.
 
 Format example:
 

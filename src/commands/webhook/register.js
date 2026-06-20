@@ -9,6 +9,14 @@ import {
 } from '../../services/webhook-events.js';
 import { buildErrorEmbed, buildSuccessEmbed } from '../../utils/embeds.js';
 
+function getApiErrorMessage(err) {
+  return err?.response?.data?.message ?? err?.message ?? 'Unknown error';
+}
+
+function isInvalidDataError(err) {
+  return /invalid data/i.test(getApiErrorMessage(err));
+}
+
 export const data = new SlashCommandBuilder()
   .setName('webhook-register')
   .setDescription('Register a Vikunja webhook for a project to send notifications here')
@@ -77,21 +85,45 @@ export async function execute(interaction) {
   try {
     const eventGroups = chunkWebhookEvents(events, 5);
     const createdWebhookIds = [];
+    const invalidEvents = [];
 
     for (const group of eventGroups) {
       try {
         const res = await createWebhook(project.id, targetUrl, group);
         createdWebhookIds.push(res.data.id);
       } catch (err) {
-        const msg = err.response?.data?.message ?? err.message;
-        const partial = createdWebhookIds.length
-          ? '\nPartial success. Created webhook IDs before failure: `' + createdWebhookIds.join('`, `') + '`'
-          : '';
-        await interaction.editReply({
-          embeds: [buildErrorEmbed('Failed to register webhook: ' + msg + partial)],
-        });
-        return;
+        if (!isInvalidDataError(err)) {
+          const msg = getApiErrorMessage(err);
+          const partial = createdWebhookIds.length
+            ? '\nPartial success. Created webhook IDs before failure: `' + createdWebhookIds.join('`, `') + '`'
+            : '';
+          await interaction.editReply({
+            embeds: [buildErrorEmbed('Failed to register webhook: ' + msg + partial)],
+          });
+          return;
+        }
+
+        // If Vikunja rejects a batch as Invalid Data, try each event separately
+        // so valid events still get registered and bad ones can be reported.
+        for (const eventName of group) {
+          try {
+            const res = await createWebhook(project.id, targetUrl, [eventName]);
+            createdWebhookIds.push(res.data.id);
+          } catch (singleErr) {
+            invalidEvents.push(eventName);
+          }
+        }
       }
+    }
+
+    if (!createdWebhookIds.length) {
+      const invalidSummary = invalidEvents.length
+        ? '\nInvalid/unsupported events: `' + invalidEvents.join('`, `') + '`'
+        : '';
+      await interaction.editReply({
+        embeds: [buildErrorEmbed('Failed to register any webhooks.' + invalidSummary + '\n' + formatWebhookEventsHelp())],
+      });
+      return;
     }
 
     const secretNote = config.webhook.secret
@@ -108,6 +140,9 @@ export async function execute(interaction) {
           webhookSummary + '\n' +
           'Vikunja will now POST the selected events to `' + targetUrl + '`.' +
           eventsSummary +
+          (invalidEvents.length
+            ? '\n\nSome events were not accepted by Vikunja and were skipped: `' + invalidEvents.join('`, `') + '`.'
+            : '') +
           '\n\nTip: set `events:help` in this command to view format and common event meanings.' +
           secretNote
         ),
