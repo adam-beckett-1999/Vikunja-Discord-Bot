@@ -1,0 +1,9 @@
+services:
+  vikunja-discord-bot:
+    image: your-dockerhub-username/vikunja-discord-bot:latest
+    container_name: vikunja-discord-bot
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "3000:3000"

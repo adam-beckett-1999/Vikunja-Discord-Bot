@@ -1,0 +1,31 @@
+{
+  "name": "vikunja-discord-bot",
+  "version": "1.0.0",
+  "description": "A Discord bot for managing and receiving notifications from a Vikunja instance",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "start:docker": "node deploy-commands.js && node src/index.js",
+    "deploy": "node deploy-commands.js",
+    "deploy:global": "node deploy-commands.js --global"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/adam-beckett-1999/Vikunja-Discord-Bot.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/adam-beckett-1999/Vikunja-Discord-Bot/issues"
+  },
+  "homepage": "https://github.com/adam-beckett-1999/Vikunja-Discord-Bot#readme",
+  "dependencies": {
+    "@discordjs/rest": "^2.6.1",
+    "axios": "^1.16.0",
+    "discord.js": "^14.26.4",
+    "dotenv": "^16.6.1",
+    "express": "^5.2.1"
+  }
+}
