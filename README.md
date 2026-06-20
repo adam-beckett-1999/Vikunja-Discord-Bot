@@ -1,235 +1,87 @@
 # Vikunja Discord Bot
 
-A self-hosted Discord bot that integrates with [Vikunja](https://vikunja.io) to:
+A self-hosted Discord bot for Vikunja.
 
-- **Manage tasks** via Discord slash commands (create, list, get, update, delete).
-- **Receive notifications** in a Discord channel when tasks are created, updated, or deleted on your Vikunja instance (via Vikunja webhooks).
+It does two things:
 
----
+- Lets you manage Vikunja tasks from Discord slash commands
+- Forwards Vikunja webhook events into a Discord channel as embeds
 
-## Features
+## What you need
 
-| Slash Command | Description |
-|---|---|
-| `/task-create` | Create a new task in a Vikunja project |
-| `/task-list` | List tasks (all or filtered by project, with search & pagination) |
-| `/task-get` | Get details of a task by ID |
-| `/task-update` | Update an existing task (title, description, due date, priority, done state) |
-| `/task-delete` | Delete a task by ID |
-| `/project-list` | List all accessible Vikunja projects |
-| `/webhook-register` | Register a Vikunja webhook for a project and choose which events should notify Discord |
+- A Discord bot and application token
+- A Vikunja instance with an API token
+- A publicly reachable URL for the bot webhook endpoint
+- Docker and Docker Compose
 
-**Notifications** are delivered via an embedded Express HTTP server that receives webhook POSTs from Vikunja and forwards them to a configured Discord channel.
+## Quick start
 
----
-
-## Prerequisites
-
-- **Node.js ≥ 18** (tested on Node 22)
-- A **Discord Application** with a bot user ([Discord Developer Portal](https://discord.com/developers/applications))
-- A running **Vikunja** instance (v0.22+ recommended for webhook support)
-- A publicly reachable URL for the bot's webhook endpoint (e.g. via a reverse proxy or services like ngrok during development)
-
----
-
-## Setup
-
-### 1. Clone & install dependencies
-
-```bash
-git clone https://github.com/adam-beckett-1999/Vikunja-Discord-Bot.git
-cd Vikunja-Discord-Bot
-npm install
-```
-
-### 2. Configure environment variables
-
-Copy the example file and fill in your values:
+1. Copy the example env file and fill it in.
 
 ```bash
 cp .env.example .env
 ```
 
-| Variable | Required | Description |
+2. Start the bot with Docker Compose.
+
+```bash
+docker compose up -d
+```
+
+The compose file uses the Docker Hub image and the container will register slash commands on startup.
+
+## Docker image
+
+Public image:
+
+```text
+your-dockerhub-username/vikunja-discord-bot:latest
+```
+
+If you want to run it manually without Compose:
+
+```bash
+docker run --rm -p 3000:3000 --env-file .env your-dockerhub-username/vikunja-discord-bot:latest
+```
+
+## Environment variables
+
+Set these in `.env`:
+
+| Variable | Required | Purpose |
 |---|---|---|
-| `DISCORD_TOKEN` | ✅ | Your Discord bot token |
-| `DISCORD_CLIENT_ID` | ✅ | Your Discord application's Client ID |
-| `DISCORD_GUILD_IDS` | ✅* | Comma-separated guild IDs for guild-scoped commands (omit for global) |
-| `VIKUNJA_BASE_URL` | ✅ | Base URL of your Vikunja instance (e.g. `https://tasks.example.com`) |
-| `VIKUNJA_API_TOKEN` | ✅ | Vikunja API token (Settings → API Tokens) |
-| `WEBHOOK_PORT` | ✅ | Port the webhook server listens on (default `3000`) |
-| `WEBHOOK_SECRET` | ⬜ | Secret used to verify webhook signatures from Vikunja |
-| `NOTIFICATION_CHANNEL_ID` | ✅ | Discord channel ID where task notifications are posted |
+| `DISCORD_TOKEN` | Yes | Discord bot token |
+| `DISCORD_CLIENT_ID` | Yes | Discord application client ID |
+| `DISCORD_GUILD_IDS` | Yes* | Comma-separated guild IDs for instant slash command registration |
+| `VIKUNJA_BASE_URL` | Yes | Vikunja base URL |
+| `VIKUNJA_API_TOKEN` | Yes | Vikunja API token |
+| `WEBHOOK_PORT` | Yes | Webhook server port (default `3000`) |
+| `WEBHOOK_SECRET` | No | Secret used to verify incoming Vikunja webhooks |
+| `NOTIFICATION_CHANNEL_ID` | Yes | Discord channel for webhook embeds |
 
-### 3. Register slash commands
+\* Leave `DISCORD_GUILD_IDS` empty if you prefer global slash commands.
 
-**Guild-scoped** (instant, recommended during development):
+## How it works
+
+- Slash commands let you create, list, view, update, and delete tasks.
+- `/webhook-register` creates a Vikunja webhook for a project.
+- Vikunja sends events to the bot webhook endpoint.
+- The bot posts those events to your chosen Discord channel as embeds.
+- If `WEBHOOK_SECRET` is set, the bot verifies incoming webhook signatures.
+
+## Useful commands
+
+Register slash commands manually if you want to do it outside the container startup flow:
 
 ```bash
 npm run deploy
 ```
 
-**Global** (takes up to 1 hour to propagate):
-
-```bash
-npm run deploy:global
-```
-
-### 4. Start the bot
+Start the bot locally without Docker:
 
 ```bash
 npm start
 ```
-
-The bot logs in to Discord and starts the webhook HTTP server on `WEBHOOK_PORT`.
-
-### 5. Register a Vikunja webhook
-
-Once the bot is running and accessible at a public URL, use the Discord slash command:
-
-```text
-/webhook-register project:<project_name> url:https://your-bot.example.com/webhook events:task.created, task.updated, task.comment.created
-```
-
-The `events` option is optional and free-text. If omitted, the default lifecycle events are used: `task.created`, `task.updated`, and `task.deleted`.
-When provided, enter a comma-separated list of event names.
-The field supports long values (up to 1000 characters), so you can include many event names in one command.
-Only supported Vikunja event names are accepted; unsupported names are rejected before registration.
-
-Format example:
-
-```text
-task.created, task.updated, task.comment.created
-```
-
-Supported event meanings:
-
-| Event | Meaning |
-|---|---|
-| `task.created` | A new task was created |
-| `task.updated` | An existing task was edited |
-| `task.deleted` | A task was deleted |
-| `task.overdue` | A task became overdue |
-| `tasks.overdue` | One or more tasks became overdue |
-| `task.comment.created` | A comment was added to a task |
-| `task.comment.edited` | A task comment was edited |
-| `task.comment.deleted` | A task comment was deleted |
-| `task.assignee.created` | A user was assigned to a task |
-| `task.assignee.deleted` | A user was unassigned from a task |
-| `task.attachment.created` | An attachment was added to a task |
-| `task.attachment.deleted` | An attachment was removed from a task |
-| `task.relation.created` | A task relation was created |
-| `task.relation.deleted` | A task relation was removed |
-| `task.reminder.fired` | A task reminder fired |
-| `project.updated` | A project was updated |
-| `project.deleted` | A project was deleted |
-| `project.shared.team` | A project was shared with a team |
-| `project.shared.user` | A project was shared with a user |
-
-Vikunja will POST the selected events to the bot, which forwards them as Discord embeds to your `NOTIFICATION_CHANNEL_ID`.
-If `WEBHOOK_SECRET` is set, `/webhook-register` will include that same secret when creating the webhook so incoming deliveries can pass signature verification.
-
----
-
-## Webhook Security
-
-When `WEBHOOK_SECRET` is set, the bot verifies the `X-Vikunja-Signature` HMAC-SHA256 header on every incoming webhook request. Set the same value in Vikunja when creating the webhook to ensure only legitimate requests are processed.
-
----
-
-## Project Structure
-
-```
-├── src/
-│   ├── index.js                  # Bot entry point – loads commands & events, starts webhook server
-│   ├── config.js                 # Centralised configuration from environment variables
-│   ├── commands/
-│   │   ├── task/
-│   │   │   ├── create.js
-│   │   │   ├── list.js
-│   │   │   ├── get.js
-│   │   │   ├── update.js
-│   │   │   └── delete.js
-│   │   ├── project/
-│   │   │   └── list.js
-│   │   └── webhook/
-│   │       └── register.js
-│   ├── events/
-│   │   ├── ready.js
-│   │   └── interactionCreate.js
-│   ├── services/
-│   │   └── vikunja.js            # Axios-based Vikunja REST API client
-│   ├── utils/
-│   │   └── embeds.js             # Discord EmbedBuilder helpers
-│   └── webhook/
-│       └── server.js             # Express server that receives Vikunja webhook events
-├── tests/
-│   └── embeds.test.js            # Unit tests (Node.js built-in test runner)
-├── deploy-commands.js            # Slash command registration script
-├── .env.example
-└── package.json
-```
-
----
-
-## Running Tests
-
-```bash
-npm test
-```
-
----
-
-## Docker
-
-### Build image locally
-
-```bash
-docker build -t vikunja-discord-bot:dev .
-```
-
-### Run container locally
-
-```bash
-docker run --rm -p 3000:3000 --env-file .env vikunja-discord-bot:dev
-```
-
-The container exposes port `3000`, deploys slash commands on startup, and then starts the bot.
-Make sure `DISCORD_TOKEN`, `DISCORD_CLIENT_ID`, and `DISCORD_GUILD_IDS` are set in the container environment so command registration can succeed.
-
----
-
-## CI: Docker Hub Publish
-
-This repository includes a GitHub Actions workflow at:
-
-`.github/workflows/docker-build-push-dev.yml`
-
-It also includes a release workflow at:
-
-`.github/workflows/docker-build-push-release.yml`
-
-### Branch to tag mapping
-
-| Branch | Workflow | Published tags |
-|---|---|---|
-| `initial-dev` | `docker-build-push-dev.yml` | `dev`, `sha-<commit>` |
-| `release` | `docker-build-push-release.yml` | `latest`, `sha-<commit>` |
-
-The workflow runs on pushes to `initial-dev` (and manual runs), builds the Docker image, and publishes to Docker Hub with:
-
-- `DOCKERHUB_USERNAME/vikunja-discord-bot:dev`
-- `DOCKERHUB_USERNAME/vikunja-discord-bot:sha-<commit>`
-
-### Required repository secrets
-
-| Secret | Required | Description |
-|---|---|---|
-| `DOCKERHUB_USERNAME` | ✅ | Your Docker Hub username |
-| `DOCKERHUB_TOKEN` | ✅ | Docker Hub access token with push permissions |
-| `DISCORD_WEBHOOK_URL` | ⬜ | Optional webhook for success/failure workflow notifications |
-
----
 
 ## License
 

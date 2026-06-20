@@ -8,8 +8,7 @@
     "start": "node src/index.js",
     "start:docker": "node deploy-commands.js && node src/index.js",
     "deploy": "node deploy-commands.js",
-    "deploy:global": "node deploy-commands.js --global",
-    "test": "node --test tests/**/*.test.js"
+    "deploy:global": "node deploy-commands.js --global"
   },
   "repository": {
     "type": "git",
