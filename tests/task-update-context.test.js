@@ -40,4 +40,13 @@ describe('task update context', () => {
 
     clearTaskSnapshot(77);
   });
+
+  test('manual task update suppression can consume multiple webhook updates', () => {
+    markManualTaskUpdate(55, 3);
+
+    assert.strictEqual(shouldSuppressWebhookUpdate(55), true);
+    assert.strictEqual(shouldSuppressWebhookUpdate(55), true);
+    assert.strictEqual(shouldSuppressWebhookUpdate(55), true);
+    assert.strictEqual(shouldSuppressWebhookUpdate(55), false);
+  });
 });

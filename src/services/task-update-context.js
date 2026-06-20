@@ -10,8 +10,9 @@ function toTaskId(taskOrId) {
 }
 
 function purgeExpiredManualUpdates(now = Date.now()) {
-  for (const [taskId, timestamp] of recentManualUpdates.entries()) {
-    if (now - timestamp > MANUAL_UPDATE_TTL_MS) {
+  for (const [taskId, marker] of recentManualUpdates.entries()) {
+    const expiresAt = marker?.expiresAt ?? (typeof marker === 'number' ? marker + MANUAL_UPDATE_TTL_MS : 0);
+    if (now > expiresAt) {
       recentManualUpdates.delete(taskId);
     }
   }
@@ -22,11 +23,20 @@ function purgeExpiredManualUpdates(now = Date.now()) {
  * callback can be suppressed to avoid duplicate notifications.
  *
  * @param {number|string} taskId
+ * @param {number} [suppressCount=1]
  */
-export function markManualTaskUpdate(taskId) {
+export function markManualTaskUpdate(taskId, suppressCount = 1) {
   if (taskId === undefined || taskId === null) return;
+
+  const count = Number.isFinite(suppressCount)
+    ? Math.max(1, Math.trunc(suppressCount))
+    : 1;
+
   purgeExpiredManualUpdates();
-  recentManualUpdates.set(String(taskId), Date.now());
+  recentManualUpdates.set(String(taskId), {
+    remaining: count,
+    expiresAt: Date.now() + MANUAL_UPDATE_TTL_MS,
+  });
 }
 
 /**
@@ -41,10 +51,19 @@ export function shouldSuppressWebhookUpdate(taskId) {
 
   purgeExpiredManualUpdates();
   const key = String(taskId);
-  if (!recentManualUpdates.has(key)) return false;
+  const marker = recentManualUpdates.get(key);
+  if (!marker) return false;
 
-  // One-time suppression: consume marker when used.
-  recentManualUpdates.delete(key);
+  const remaining = Number.isFinite(marker?.remaining) ? marker.remaining : 1;
+  if (remaining <= 1) {
+    recentManualUpdates.delete(key);
+  } else {
+    recentManualUpdates.set(key, {
+      remaining: remaining - 1,
+      expiresAt: marker.expiresAt ?? (Date.now() + MANUAL_UPDATE_TTL_MS),
+    });
+  }
+
   return true;
 }
 
