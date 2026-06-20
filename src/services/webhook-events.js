@@ -18,6 +18,24 @@ export const WEBHOOK_EVENT_SUGGESTIONS = [
   'project.deleted',
 ];
 
+export const WEBHOOK_EVENT_DESCRIPTIONS = {
+  'task.created': 'A new task was created.',
+  'task.updated': 'An existing task was edited.',
+  'task.deleted': 'A task was deleted.',
+  'task.comment.created': 'A comment was added to a task.',
+  'task.comment.updated': 'A task comment was edited.',
+  'task.comment.deleted': 'A task comment was deleted.',
+  'task.assignee.created': 'A user was assigned to a task.',
+  'task.assignee.deleted': 'A user was unassigned from a task.',
+  'task.attachment.created': 'An attachment was added to a task.',
+  'task.attachment.deleted': 'An attachment was removed from a task.',
+  'task.reminder.created': 'A reminder was created for a task.',
+  'task.reminder.deleted': 'A reminder was removed from a task.',
+  'project.created': 'A project was created.',
+  'project.updated': 'A project was updated.',
+  'project.deleted': 'A project was deleted.',
+};
+
 const EVENT_TOKEN_PATTERN = /^[a-z0-9]+(?:[._-][a-z0-9]+)*$/i;
 
 /**
@@ -60,19 +78,23 @@ export function parseWebhookEventsInput(rawInput) {
 }
 
 /**
- * Build autocomplete choices for a single event token option.
+ * Build a user-facing help string for webhook event input and common meanings.
  *
- * @param {string} currentValue
- * @returns {Array<{name: string, value: string}>}
+ * @returns {string}
  */
-export function autocompleteWebhookEventToken(currentValue) {
-  const query = (currentValue ?? '').trim().toLowerCase();
+export function formatWebhookEventsHelp() {
+  const lines = [
+    'Format: comma-separated event names.',
+    'Example: `task.created, task.updated, task.comment.created`',
+    'If omitted, defaults are: `task.created`, `task.updated`, `task.deleted`.',
+    '',
+    'Common events:',
+  ];
 
-  return WEBHOOK_EVENT_SUGGESTIONS
-    .filter((eventName) => !query || eventName.toLowerCase().includes(query))
-    .slice(0, 25)
-    .map((eventName) => ({
-      name: eventName,
-      value: eventName,
-    }));
+  for (const eventName of WEBHOOK_EVENT_SUGGESTIONS) {
+    const description = WEBHOOK_EVENT_DESCRIPTIONS[eventName] ?? 'Event description not documented.';
+    lines.push('- `' + eventName + '` - ' + description);
+  }
+
+  return lines.join('\n');
 }
