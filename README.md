@@ -94,8 +94,7 @@ Once the bot is running and accessible at a public URL, use the Discord slash co
 The `events` option is optional and free-text. If omitted, the default lifecycle events are used: `task.created`, `task.updated`, and `task.deleted`.
 When provided, enter a comma-separated list of event names.
 The field supports long values (up to 1000 characters), so you can include many event names in one command.
-If the selected event list is larger than the per-webhook event limit enforced by Vikunja, the bot automatically creates multiple webhooks (in batches of 5 events) for the same project and URL.
-If some event names are unsupported by your Vikunja version, the bot registers the supported ones and reports skipped events in the command response.
+Only supported Vikunja event names are accepted; unsupported names are rejected before registration.
 
 Format example:
 
@@ -103,25 +102,29 @@ Format example:
 task.created, task.updated, task.comment.created
 ```
 
-Common event meanings:
+Supported event meanings:
 
 | Event | Meaning |
 |---|---|
 | `task.created` | A new task was created |
 | `task.updated` | An existing task was edited |
 | `task.deleted` | A task was deleted |
+| `task.overdue` | A task became overdue |
+| `tasks.overdue` | One or more tasks became overdue |
 | `task.comment.created` | A comment was added to a task |
-| `task.comment.updated` | A task comment was edited |
+| `task.comment.edited` | A task comment was edited |
 | `task.comment.deleted` | A task comment was deleted |
 | `task.assignee.created` | A user was assigned to a task |
 | `task.assignee.deleted` | A user was unassigned from a task |
 | `task.attachment.created` | An attachment was added to a task |
 | `task.attachment.deleted` | An attachment was removed from a task |
-| `task.reminder.created` | A reminder was created for a task |
-| `task.reminder.deleted` | A reminder was removed from a task |
-| `project.created` | A project was created |
+| `task.relation.created` | A task relation was created |
+| `task.relation.deleted` | A task relation was removed |
+| `task.reminder.fired` | A task reminder fired |
 | `project.updated` | A project was updated |
 | `project.deleted` | A project was deleted |
+| `project.shared.team` | A project was shared with a team |
+| `project.shared.user` | A project was shared with a user |
 
 Vikunja will POST the selected events to the bot, which forwards them as Discord embeds to your `NOTIFICATION_CHANNEL_ID`.
 If `WEBHOOK_SECRET` is set, `/webhook-register` will include that same secret when creating the webhook so incoming deliveries can pass signature verification.

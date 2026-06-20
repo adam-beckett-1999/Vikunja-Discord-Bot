@@ -1,7 +1,6 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  chunkWebhookEvents,
   DEFAULT_WEBHOOK_EVENTS,
   formatWebhookEventsHelp,
   parseWebhookEventsInput,
@@ -16,10 +15,11 @@ describe('webhook event parsing', () => {
   });
 
   test('deduplicates and normalizes custom event list', () => {
-    const { events, invalid } = parseWebhookEventsInput('Task.Created, task.created, task.comment.created');
+    const { events, invalid, unsupported } = parseWebhookEventsInput('Task.Created, task.created, task.comment.created');
 
     assert.deepStrictEqual(events, ['task.created', 'task.comment.created']);
     assert.deepStrictEqual(invalid, []);
+    assert.deepStrictEqual(unsupported, []);
   });
 
   test('returns invalid tokens separately', () => {
@@ -27,6 +27,14 @@ describe('webhook event parsing', () => {
 
     assert.deepStrictEqual(events, ['task.created', 'task.updated']);
     assert.deepStrictEqual(invalid, ['???']);
+  });
+
+  test('returns unsupported events separately', () => {
+    const { events, invalid, unsupported } = parseWebhookEventsInput('task.comment.updated, project.created, task.updated');
+
+    assert.deepStrictEqual(events, ['task.updated']);
+    assert.deepStrictEqual(invalid, []);
+    assert.deepStrictEqual(unsupported, ['task.comment.updated', 'project.created']);
   });
 });
 
@@ -43,23 +51,7 @@ describe('webhook event help text', () => {
 
     assert.ok(help.includes('`task.created` - A new task was created.'));
     assert.ok(help.includes('`project.deleted` - A project was deleted.'));
-    assert.ok(help.includes('the bot registers multiple webhooks automatically'));
-  });
-});
-
-describe('webhook event chunking', () => {
-  test('splits events into groups of five', () => {
-    const input = ['e1', 'e2', 'e3', 'e4', 'e5', 'e6', 'e7'];
-    const groups = chunkWebhookEvents(input, 5);
-
-    assert.deepStrictEqual(groups, [
-      ['e1', 'e2', 'e3', 'e4', 'e5'],
-      ['e6', 'e7'],
-    ]);
-  });
-
-  test('handles small lists as a single group', () => {
-    const groups = chunkWebhookEvents(['task.created', 'task.updated'], 5);
-    assert.deepStrictEqual(groups, [['task.created', 'task.updated']]);
+    assert.ok(help.includes('`task.comment.edited` - A task comment was edited.'));
+    assert.ok(!help.includes('task.comment.updated'));
   });
 });

@@ -1,39 +1,50 @@
 export const DEFAULT_WEBHOOK_EVENTS = ['task.created', 'task.updated', 'task.deleted'];
 
-// Suggested values for command autocomplete. These are examples only; users can
-// still enter custom Vikunja event names supported by their server version.
+// Event list aligned with the Vikunja webhook UI shown by the user.
 export const WEBHOOK_EVENT_SUGGESTIONS = [
-  ...DEFAULT_WEBHOOK_EVENTS,
-  'task.comment.created',
-  'task.comment.updated',
-  'task.comment.deleted',
+  'project.deleted',
+  'project.shared.team',
+  'project.shared.user',
+  'project.updated',
   'task.assignee.created',
   'task.assignee.deleted',
   'task.attachment.created',
   'task.attachment.deleted',
-  'task.reminder.created',
-  'task.reminder.deleted',
-  'project.created',
-  'project.updated',
-  'project.deleted',
+  'task.comment.created',
+  'task.comment.deleted',
+  'task.comment.edited',
+  'task.created',
+  'task.deleted',
+  'task.overdue',
+  'task.relation.created',
+  'task.relation.deleted',
+  'task.reminder.fired',
+  'task.updated',
+  'tasks.overdue',
 ];
+
+const SUPPORTED_WEBHOOK_EVENTS = new Set(WEBHOOK_EVENT_SUGGESTIONS);
 
 export const WEBHOOK_EVENT_DESCRIPTIONS = {
   'task.created': 'A new task was created.',
   'task.updated': 'An existing task was edited.',
   'task.deleted': 'A task was deleted.',
+  'task.overdue': 'A task became overdue.',
+  'tasks.overdue': 'One or more tasks became overdue.',
   'task.comment.created': 'A comment was added to a task.',
-  'task.comment.updated': 'A task comment was edited.',
+  'task.comment.edited': 'A task comment was edited.',
   'task.comment.deleted': 'A task comment was deleted.',
   'task.assignee.created': 'A user was assigned to a task.',
   'task.assignee.deleted': 'A user was unassigned from a task.',
   'task.attachment.created': 'An attachment was added to a task.',
   'task.attachment.deleted': 'An attachment was removed from a task.',
-  'task.reminder.created': 'A reminder was created for a task.',
-  'task.reminder.deleted': 'A reminder was removed from a task.',
-  'project.created': 'A project was created.',
+  'task.relation.created': 'A task relation was created.',
+  'task.relation.deleted': 'A task relation was removed.',
+  'task.reminder.fired': 'A task reminder was fired.',
   'project.updated': 'A project was updated.',
   'project.deleted': 'A project was deleted.',
+  'project.shared.team': 'A project was shared with a team.',
+  'project.shared.user': 'A project was shared with a user.',
 };
 
 const EVENT_TOKEN_PATTERN = /^[a-z0-9]+(?:[._-][a-z0-9]+)*$/i;
@@ -42,11 +53,11 @@ const EVENT_TOKEN_PATTERN = /^[a-z0-9]+(?:[._-][a-z0-9]+)*$/i;
  * Parse a comma-separated event list from slash command input.
  *
  * @param {string|null|undefined} rawInput
- * @returns {{events: string[], invalid: string[]}}
+ * @returns {{events: string[], invalid: string[], unsupported: string[]}}
  */
 export function parseWebhookEventsInput(rawInput) {
   if (!rawInput || !rawInput.trim()) {
-    return { events: DEFAULT_WEBHOOK_EVENTS, invalid: [] };
+    return { events: DEFAULT_WEBHOOK_EVENTS, invalid: [], unsupported: [] };
   }
 
   const tokens = rawInput
@@ -55,6 +66,7 @@ export function parseWebhookEventsInput(rawInput) {
     .filter(Boolean);
 
   const invalid = [];
+  const unsupported = [];
   const deduped = [];
   const seen = new Set();
 
@@ -67,35 +79,16 @@ export function parseWebhookEventsInput(rawInput) {
     const normalized = token.toLowerCase();
     if (seen.has(normalized)) continue;
     seen.add(normalized);
+
+    if (!SUPPORTED_WEBHOOK_EVENTS.has(normalized)) {
+      unsupported.push(normalized);
+      continue;
+    }
+
     deduped.push(normalized);
   }
 
-  if (!deduped.length) {
-    return { events: DEFAULT_WEBHOOK_EVENTS, invalid };
-  }
-
-  return { events: deduped, invalid };
-}
-
-/**
- * Split events into groups for webhook registration.
- *
- * Some Vikunja deployments enforce a maximum number of events per webhook
- * payload. Grouping keeps registration reliable for larger event lists.
- *
- * @param {string[]} events
- * @param {number} [maxPerWebhook=5]
- * @returns {string[][]}
- */
-export function chunkWebhookEvents(events, maxPerWebhook = 5) {
-  const size = Math.max(1, Math.floor(maxPerWebhook));
-  const groups = [];
-
-  for (let i = 0; i < events.length; i += size) {
-    groups.push(events.slice(i, i + size));
-  }
-
-  return groups;
+  return { events: deduped, invalid, unsupported };
 }
 
 /**
@@ -108,9 +101,9 @@ export function formatWebhookEventsHelp() {
     'Format: comma-separated event names.',
     'Example: `task.created, task.updated, task.comment.created`',
     'If omitted, defaults are: `task.created`, `task.updated`, `task.deleted`.',
-    'If more than 5 events are provided, the bot registers multiple webhooks automatically.',
+    'Only the supported event names below are accepted.',
     '',
-    'Common events:',
+    'Supported events:',
   ];
 
   for (const eventName of WEBHOOK_EVENT_SUGGESTIONS) {
