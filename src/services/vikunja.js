@@ -1,5 +1,6 @@
 import axios from 'axios';
 import config from '../config.js';
+import { DEFAULT_WEBHOOK_EVENTS } from './webhook-events.js';
 
 /**
  * Axios instance pre-configured for the Vikunja REST API.
@@ -119,7 +120,7 @@ export async function deleteTask(taskId) {
 export async function createWebhook(projectId, targetUrl, events) {
   const payload = {
     target_url: targetUrl,
-    events: events ?? ['task.created', 'task.updated', 'task.deleted'],
+    events: events ?? DEFAULT_WEBHOOK_EVENTS,
   };
 
   if (config.webhook.secret) {

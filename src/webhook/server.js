@@ -4,8 +4,6 @@ import config from '../config.js';
 import { buildTaskEmbed } from '../utils/embeds.js';
 import { EmbedBuilder } from 'discord.js';
 
-const SUPPORTED_EVENTS = new Set(['task.created', 'task.updated', 'task.deleted']);
-
 /**
  * Action label map for embed titles.
  */
@@ -90,12 +88,6 @@ export function startWebhookServer(discordClient) {
 
     console.log('[Webhook] Received event: ' + (eventType ?? 'unknown'));
 
-    if (!SUPPORTED_EVENTS.has(eventType)) {
-      // Acknowledge but don't act on unknown events.
-      console.warn('[Webhook] Ignored unsupported event: ' + (eventType ?? 'unknown'));
-      return res.status(200).json({ status: 'ignored', event: eventType });
-    }
-
     res.status(200).json({ status: 'ok' });
 
     // Post notification asynchronously so we don't block the HTTP response.
@@ -137,22 +129,73 @@ async function postNotification(discordClient, eventType, payload) {
   }
 
   const task = payload.data?.task ?? payload.task ?? payload.data;
-  if (!task) {
-    console.warn('[Webhook] Payload did not contain a task object for event: ' + eventType);
-    return;
-  }
 
   let embed;
-  if (eventType === 'task.deleted') {
+  if (task && eventType === 'task.deleted') {
     // On deletion, the task may only have an ID – build a minimal embed.
     embed = new EmbedBuilder()
       .setColor(0xe74c3c)
       .setTitle('Deleted: ' + (task.title ?? 'Task ' + task.id))
       .setFooter({ text: 'Task ID: ' + task.id })
       .setTimestamp();
+  } else if (task) {
+    embed = buildTaskEmbed(task, getEventActionLabel(eventType));
   } else {
-    embed = buildTaskEmbed(task, EVENT_ACTION[eventType]);
+    embed = buildGenericEventEmbed(eventType, payload);
   }
 
   await channel.send({ embeds: [embed] });
+}
+
+/**
+ * Derive an action label for embed titles from the webhook event name.
+ *
+ * @param {string|undefined} eventType
+ * @returns {string}
+ */
+function getEventActionLabel(eventType) {
+  if (!eventType) return 'Updated';
+  if (EVENT_ACTION[eventType]) return EVENT_ACTION[eventType];
+
+  const withoutEntity = eventType.includes('.')
+    ? eventType.split('.').slice(1).join(' ')
+    : eventType;
+
+  return withoutEntity
+    .split(/[._-]/)
+    .filter(Boolean)
+    .map((token) => token.charAt(0).toUpperCase() + token.slice(1))
+    .join(' ');
+}
+
+/**
+ * Build a generic embed for events that do not include a task object.
+ *
+ * @param {string|undefined} eventType
+ * @param {object} payload
+ * @returns {EmbedBuilder}
+ */
+function buildGenericEventEmbed(eventType, payload) {
+  const projectId = payload?.project_id ?? payload?.data?.project_id ?? payload?.data?.project?.id;
+  const payloadId = payload?.data?.id ?? payload?.id;
+
+  const fields = [];
+  if (projectId !== undefined) {
+    fields.push({ name: 'Project ID', value: String(projectId), inline: true });
+  }
+  if (payloadId !== undefined) {
+    fields.push({ name: 'Entity ID', value: String(payloadId), inline: true });
+  }
+
+  const embed = new EmbedBuilder()
+    .setColor(0x3498db)
+    .setTitle('Vikunja Event: ' + (eventType ?? 'unknown'))
+    .setDescription('Received a webhook event without task details.')
+    .setTimestamp();
+
+  if (fields.length) {
+    embed.addFields(fields);
+  }
+
+  return embed;
 }
