@@ -3,6 +3,7 @@ import { createWebhook } from '../../services/vikunja.js';
 import config from '../../config.js';
 import { autocompleteProjects, resolveProjectSelection } from '../../services/vikunja-lookups.js';
 import {
+  chunkWebhookEvents,
   formatWebhookEventsHelp,
   parseWebhookEventsInput,
 } from '../../services/webhook-events.js';
@@ -74,15 +75,37 @@ export async function execute(interaction) {
   }
 
   try {
-    const res = await createWebhook(project.id, targetUrl, events);
+    const eventGroups = chunkWebhookEvents(events, 5);
+    const createdWebhookIds = [];
+
+    for (const group of eventGroups) {
+      try {
+        const res = await createWebhook(project.id, targetUrl, group);
+        createdWebhookIds.push(res.data.id);
+      } catch (err) {
+        const msg = err.response?.data?.message ?? err.message;
+        const partial = createdWebhookIds.length
+          ? '\nPartial success. Created webhook IDs before failure: `' + createdWebhookIds.join('`, `') + '`'
+          : '';
+        await interaction.editReply({
+          embeds: [buildErrorEmbed('Failed to register webhook: ' + msg + partial)],
+        });
+        return;
+      }
+    }
+
     const secretNote = config.webhook.secret
       ? '\nUsing configured webhook secret for signature verification.'
       : '';
     const eventsSummary = '\nEvents: `' + events.join('`, `') + '`';
+    const webhookSummary = eventGroups.length === 1
+      ? 'Webhook `' + createdWebhookIds[0] + '` registered on project `' + project.title + '`.'
+      : 'Registered `' + eventGroups.length + '` webhooks on project `' + project.title + '` to cover all selected events. IDs: `' + createdWebhookIds.join('`, `') + '`.';
+
     await interaction.editReply({
       embeds: [
         buildSuccessEmbed(
-          'Webhook `' + res.data.id + '` registered on project `' + project.title + '`.\n' +
+          webhookSummary + '\n' +
           'Vikunja will now POST the selected events to `' + targetUrl + '`.' +
           eventsSummary +
           '\n\nTip: set `events:help` in this command to view format and common event meanings.' +
@@ -90,10 +113,9 @@ export async function execute(interaction) {
         ),
       ],
     });
-  } catch (err) {
-    const msg = err.response?.data?.message ?? err.message;
+  } catch {
     await interaction.editReply({
-      embeds: [buildErrorEmbed('Failed to register webhook: ' + msg)],
+      embeds: [buildErrorEmbed('Failed to register webhook due to an unexpected error.')],
     });
   }
 }

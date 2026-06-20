@@ -1,6 +1,7 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  chunkWebhookEvents,
   DEFAULT_WEBHOOK_EVENTS,
   formatWebhookEventsHelp,
   parseWebhookEventsInput,
@@ -42,5 +43,23 @@ describe('webhook event help text', () => {
 
     assert.ok(help.includes('`task.created` - A new task was created.'));
     assert.ok(help.includes('`project.deleted` - A project was deleted.'));
+    assert.ok(help.includes('the bot registers multiple webhooks automatically'));
+  });
+});
+
+describe('webhook event chunking', () => {
+  test('splits events into groups of five', () => {
+    const input = ['e1', 'e2', 'e3', 'e4', 'e5', 'e6', 'e7'];
+    const groups = chunkWebhookEvents(input, 5);
+
+    assert.deepStrictEqual(groups, [
+      ['e1', 'e2', 'e3', 'e4', 'e5'],
+      ['e6', 'e7'],
+    ]);
+  });
+
+  test('handles small lists as a single group', () => {
+    const groups = chunkWebhookEvents(['task.created', 'task.updated'], 5);
+    assert.deepStrictEqual(groups, [['task.created', 'task.updated']]);
   });
 });

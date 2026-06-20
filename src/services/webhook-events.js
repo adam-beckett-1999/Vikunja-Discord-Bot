@@ -78,6 +78,27 @@ export function parseWebhookEventsInput(rawInput) {
 }
 
 /**
+ * Split events into groups for webhook registration.
+ *
+ * Some Vikunja deployments enforce a maximum number of events per webhook
+ * payload. Grouping keeps registration reliable for larger event lists.
+ *
+ * @param {string[]} events
+ * @param {number} [maxPerWebhook=5]
+ * @returns {string[][]}
+ */
+export function chunkWebhookEvents(events, maxPerWebhook = 5) {
+  const size = Math.max(1, Math.floor(maxPerWebhook));
+  const groups = [];
+
+  for (let i = 0; i < events.length; i += size) {
+    groups.push(events.slice(i, i + size));
+  }
+
+  return groups;
+}
+
+/**
  * Build a user-facing help string for webhook event input and common meanings.
  *
  * @returns {string}
@@ -87,6 +108,7 @@ export function formatWebhookEventsHelp() {
     'Format: comma-separated event names.',
     'Example: `task.created, task.updated, task.comment.created`',
     'If omitted, defaults are: `task.created`, `task.updated`, `task.deleted`.',
+    'If more than 5 events are provided, the bot registers multiple webhooks automatically.',
     '',
     'Common events:',
   ];
