@@ -130,6 +130,25 @@ async function requestFirstSuccess(operations) {
   throw lastError;
 }
 
+async function requestFirstMutationSuccess(operations) {
+  let lastError;
+
+  for (const operation of operations) {
+    try {
+      return await operation();
+    } catch (err) {
+      lastError = err;
+      const status = Number(err?.response?.status);
+      // Try next candidate for common route/payload compatibility failures.
+      if (![400, 404, 405, 422].includes(status)) {
+        throw err;
+      }
+    }
+  }
+
+  throw lastError;
+}
+
 /**
  * Fetch all tags/labels available to the authenticated user.
  * Supports Vikunja versions exposing either /labels or /tags endpoints.
@@ -192,6 +211,47 @@ export async function replaceTaskTags(taskId, tags) {
   }
 
   throw lastError;
+}
+
+/**
+ * Link a tag/label to a task.
+ * Uses endpoint and payload fallbacks to support Vikunja version differences.
+ *
+ * @param {number} taskId
+ * @param {number|string} tagId
+ */
+export async function addTagToTask(taskId, tagId) {
+  const id = Number(tagId);
+
+  return requestFirstMutationSuccess([
+    () => vikunjaClient.put('/tasks/' + taskId + '/labels', { id }),
+    () => vikunjaClient.put('/tasks/' + taskId + '/labels', { label_id: id }),
+    () => vikunjaClient.post('/tasks/' + taskId + '/labels', { id }),
+    () => vikunjaClient.post('/tasks/' + taskId + '/labels', { label_id: id }),
+    () => vikunjaClient.put('/tasks/' + taskId + '/labels/' + id),
+    () => vikunjaClient.post('/tasks/' + taskId + '/labels/' + id),
+    () => vikunjaClient.put('/tasks/' + taskId + '/tags', { id }),
+    () => vikunjaClient.put('/tasks/' + taskId + '/tags', { tag_id: id }),
+    () => vikunjaClient.post('/tasks/' + taskId + '/tags', { id }),
+    () => vikunjaClient.post('/tasks/' + taskId + '/tags', { tag_id: id }),
+    () => vikunjaClient.put('/tasks/' + taskId + '/tags/' + id),
+    () => vikunjaClient.post('/tasks/' + taskId + '/tags/' + id),
+  ]);
+}
+
+/**
+ * Unlink a tag/label from a task.
+ *
+ * @param {number} taskId
+ * @param {number|string} tagId
+ */
+export async function removeTagFromTask(taskId, tagId) {
+  const id = Number(tagId);
+
+  return requestFirstMutationSuccess([
+    () => vikunjaClient.delete('/tasks/' + taskId + '/labels/' + id),
+    () => vikunjaClient.delete('/tasks/' + taskId + '/tags/' + id),
+  ]);
 }
 
 // ─── Webhooks ─────────────────────────────────────────────────────────────────

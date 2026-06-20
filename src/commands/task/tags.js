@@ -1,5 +1,11 @@
 import { SlashCommandBuilder } from 'discord.js';
-import { createTag, getAllTags, getTask, replaceTaskTags } from '../../services/vikunja.js';
+import {
+  addTagToTask,
+  createTag,
+  getAllTags,
+  getTask,
+  removeTagFromTask,
+} from '../../services/vikunja.js';
 import {
   autocompleteProjects,
   autocompleteTasks,
@@ -145,18 +151,18 @@ export async function execute(interaction) {
     const currentTaskResponse = await getTask(task.id);
     const currentTask = currentTaskResponse.data;
     const currentTags = pickTaskTags(currentTask);
+    const currentByName = new Map(currentTags.map((tag) => [tag.title.toLowerCase(), tag]));
 
-    const desiredByName = new Map(currentTags.map((tag) => [tag.title.toLowerCase(), tag]));
-
-    for (const removeName of toRemove) {
-      desiredByName.delete(removeName.toLowerCase());
-    }
+    const removeTagIds = toRemove
+      .map((name) => currentByName.get(name.toLowerCase())?.id)
+      .filter((id) => Number.isFinite(Number(id)));
 
     let globalTagByName = await ensureGlobalTagMap().catch(() => new Map());
+    const addTagIds = [];
 
     for (const addName of toAdd) {
       const key = addName.toLowerCase();
-      if (desiredByName.has(key)) continue;
+      if (currentByName.has(key)) continue;
 
       let tag = globalTagByName.get(key);
       if (!tag) {
@@ -178,15 +184,18 @@ export async function execute(interaction) {
         throw new Error('Could not resolve created tag id for "' + addName + '".');
       }
 
-      desiredByName.set(key, tag);
+      addTagIds.push(Number(tag.id));
     }
 
-    const desiredTags = [...desiredByName.values()];
+    for (const tagId of removeTagIds) {
+      await removeTagFromTask(task.id, tagId);
+    }
 
-    const updateResponse = await replaceTaskTags(task.id, desiredTags);
-    const updatedTask = updateResponse?.data?.id
-      ? updateResponse.data
-      : (await getTask(task.id)).data;
+    for (const tagId of addTagIds) {
+      await addTagToTask(task.id, tagId);
+    }
+
+    const updatedTask = (await getTask(task.id)).data;
 
     markManualTaskUpdate(task.id);
     cacheTaskSnapshot(updatedTask);
