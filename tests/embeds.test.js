@@ -82,6 +82,21 @@ describe('embed helpers – pure logic', () => {
     assert.ok(projectField, 'Project field should exist');
     assert.strictEqual(projectField.value, 'Services & Containers');
   });
+
+  test('task embed shows updated field details when provided', () => {
+    const embed = buildTaskEmbed(
+      { id: 4, title: 'Task', priority: 0, done: false },
+      'Updated',
+      undefined,
+      { field: 'Title', before: 'Old title', after: 'New title' }
+    );
+    const data = embed.toJSON();
+    const updatedField = (data.fields ?? []).find((field) => field.name === 'Updated');
+
+    assert.ok(updatedField, 'Updated field should exist');
+    assert.ok(updatedField.value.includes('**Title**'));
+    assert.ok(updatedField.value.includes('Old title → New title'));
+  });
 });
 
 describe('config parsing helpers', () => {
