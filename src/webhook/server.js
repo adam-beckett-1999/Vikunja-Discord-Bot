@@ -16,6 +16,18 @@ const EVENT_ACTION = {
 };
 
 /**
+ * Resolve the webhook event type from the Vikunja payload.
+ * Vikunja documents and tests currently use `event_name`, while older or
+ * alternative producers may use `event_type` or `type`.
+ *
+ * @param {object} payload
+ * @returns {string|undefined}
+ */
+export function getWebhookEventType(payload) {
+  return payload?.event_name ?? payload?.event_type ?? payload?.type;
+}
+
+/**
  * Verify the HMAC-SHA256 signature sent by Vikunja to ensure the request is
  * legitimate.  Vikunja signs the raw body with the webhook secret and places
  * the hex digest in the `X-Vikunja-Signature` header.
@@ -74,7 +86,7 @@ export function startWebhookServer(discordClient) {
       return res.status(400).json({ error: 'Invalid JSON' });
     }
 
-    const eventType = payload.event_type ?? payload.type;
+    const eventType = getWebhookEventType(payload);
 
     console.log('[Webhook] Received event: ' + (eventType ?? 'unknown'));
 
