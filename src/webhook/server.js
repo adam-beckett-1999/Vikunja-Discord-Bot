@@ -139,7 +139,7 @@ async function postNotification(discordClient, eventType, payload) {
       .setFooter({ text: 'Task ID: ' + task.id })
       .setTimestamp();
   } else if (task) {
-    embed = buildTaskEmbed(task, getEventActionLabel(eventType));
+    embed = buildTaskEmbed(task, getEventActionLabel(eventType), undefined, getTaskUpdateHighlight(eventType, payload, task));
   } else {
     embed = buildGenericEventEmbed(eventType, payload);
   }
@@ -166,6 +166,70 @@ function getEventActionLabel(eventType) {
     .filter(Boolean)
     .map((token) => token.charAt(0).toUpperCase() + token.slice(1))
     .join(' ');
+}
+
+export function getTaskUpdateHighlight(eventType, payload, task) {
+  if (eventType !== 'task.updated' || !task) return null;
+
+  const oldTask = payload?.data?.old_task
+    ?? payload?.old_task
+    ?? payload?.data?.oldTask
+    ?? payload?.oldTask;
+
+  if (!oldTask || typeof oldTask !== 'object') return null;
+
+  const fields = [
+    'title',
+    'description',
+    'done',
+    'priority',
+    'due_date',
+    'start_date',
+    'end_date',
+    'project_id',
+  ];
+
+  for (const field of fields) {
+    if (!Object.hasOwn(oldTask, field) || !Object.hasOwn(task, field)) {
+      continue;
+    }
+    if (!areEqualForDisplay(oldTask[field], task[field])) {
+      return {
+        field: formatFieldName(field),
+        before: formatFieldValue(oldTask[field]),
+        after: formatFieldValue(task[field]),
+      };
+    }
+  }
+
+  return null;
+}
+
+function formatFieldName(field) {
+  return field
+    .replace(/_/g, ' ')
+    .split(' ')
+    .filter(Boolean)
+    .map((token) => token.charAt(0).toUpperCase() + token.slice(1))
+    .join(' ');
+}
+
+function areEqualForDisplay(a, b) {
+  return formatComparableValue(a) === formatComparableValue(b);
+}
+
+function formatComparableValue(value) {
+  if (value === undefined || value === null) return '';
+  if (typeof value === 'string') return value.trim();
+  if (value instanceof Date) return value.toISOString();
+  return JSON.stringify(value);
+}
+
+function formatFieldValue(value) {
+  if (value === undefined || value === null || value === '') return 'empty';
+  if (typeof value === 'boolean') return value ? 'true' : 'false';
+  if (typeof value === 'string') return value.length > 120 ? value.slice(0, 117) + '…' : value;
+  return String(value);
 }
 
 /**

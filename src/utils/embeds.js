@@ -28,9 +28,10 @@ const PRIORITY_COLOURS = {
  * @param {object} task - Raw task object from the Vikunja API.
  * @param {string} [action] - Optional action label for the embed title (e.g. "Created").
  * @param {string} [projectName] - Optional resolved project name for clearer display.
+ * @param {{field: string, before: string, after: string}|null} [updateHighlight]
  * @returns {EmbedBuilder}
  */
-export function buildTaskEmbed(task, action, projectName) {
+export function buildTaskEmbed(task, action, projectName, updateHighlight) {
   const priority = task.priority ?? 0;
   const colour = PRIORITY_COLOURS[priority] ?? 0x95a5a6;
 
@@ -71,6 +72,13 @@ export function buildTaskEmbed(task, action, projectName) {
     embed.addFields({ name: 'Status', value: '✅ Done', inline: true });
   } else {
     embed.addFields({ name: 'Status', value: '🔲 Pending', inline: true });
+  }
+
+  if (updateHighlight?.field) {
+    embed.addFields({
+      name: 'Updated',
+      value: '**' + updateHighlight.field + '**\n' + updateHighlight.before + ' → ' + updateHighlight.after,
+    });
   }
 
   embed.setTimestamp(task.updated ? new Date(task.updated) : new Date());
