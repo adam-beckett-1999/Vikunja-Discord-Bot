@@ -107,7 +107,7 @@ export async function deleteTask(taskId) {
   return vikunjaClient.delete('/tasks/' + taskId);
 }
 
-// ─── Tags / Labels ────────────────────────────────────────────────────────────
+// ─── Labels ───────────────────────────────────────────────────────────────────
 
 function isEndpointNotFound(err) {
   return Number(err?.response?.status) === 404;
@@ -150,10 +150,10 @@ async function requestFirstMutationSuccess(operations) {
 }
 
 /**
- * Fetch all tags/labels available to the authenticated user.
+ * Fetch all labels available to the authenticated user.
  * Supports Vikunja versions exposing either /labels or /tags endpoints.
  */
-export async function getAllTags() {
+export async function getAllLabels() {
   return requestFirstSuccess([
     () => vikunjaClient.get('/labels'),
     () => vikunjaClient.get('/tags'),
@@ -161,12 +161,12 @@ export async function getAllTags() {
 }
 
 /**
- * Create a tag/label by name.
+ * Create a label by name.
  *
  * @param {string} title
  * @param {string|undefined} hexColor
  */
-export async function createTag(title, hexColor) {
+export async function createLabel(title, hexColor) {
   const payload = { title };
   if (hexColor) payload.hex_color = hexColor;
 
@@ -179,14 +179,14 @@ export async function createTag(title, hexColor) {
 }
 
 /**
- * Replace task tags/labels using the best available payload shape.
+ * Replace task labels using the best available payload shape.
  *
  * @param {number} taskId
- * @param {{id?: number|string, title?: string}[]} tags
+ * @param {{id?: number|string, title?: string}[]} labels
  */
-export async function replaceTaskTags(taskId, tags) {
-  const ids = tags
-    .map((tag) => Number(tag?.id))
+export async function replaceTaskLabels(taskId, labels) {
+  const ids = labels
+    .map((label) => Number(label?.id))
     .filter((id) => Number.isFinite(id));
 
   const labelsPayload = ids.map((id) => ({ id }));
@@ -214,14 +214,14 @@ export async function replaceTaskTags(taskId, tags) {
 }
 
 /**
- * Link a tag/label to a task.
+ * Link a label to a task.
  * Uses endpoint and payload fallbacks to support Vikunja version differences.
  *
  * @param {number} taskId
- * @param {number|string} tagId
+ * @param {number|string} labelId
  */
-export async function addTagToTask(taskId, tagId) {
-  const id = Number(tagId);
+export async function addLabelToTask(taskId, labelId) {
+  const id = Number(labelId);
 
   return requestFirstMutationSuccess([
     () => vikunjaClient.put('/tasks/' + taskId + '/labels', { id }),
@@ -240,19 +240,26 @@ export async function addTagToTask(taskId, tagId) {
 }
 
 /**
- * Unlink a tag/label from a task.
+ * Unlink a label from a task.
  *
  * @param {number} taskId
- * @param {number|string} tagId
+ * @param {number|string} labelId
  */
-export async function removeTagFromTask(taskId, tagId) {
-  const id = Number(tagId);
+export async function removeLabelFromTask(taskId, labelId) {
+  const id = Number(labelId);
 
   return requestFirstMutationSuccess([
     () => vikunjaClient.delete('/tasks/' + taskId + '/labels/' + id),
     () => vikunjaClient.delete('/tasks/' + taskId + '/tags/' + id),
   ]);
 }
+
+// Backward-compatible aliases while command names transition to label terminology.
+export const getAllTags = getAllLabels;
+export const createTag = createLabel;
+export const replaceTaskTags = replaceTaskLabels;
+export const addTagToTask = addLabelToTask;
+export const removeTagFromTask = removeLabelFromTask;
 
 // ─── Webhooks ─────────────────────────────────────────────────────────────────
 

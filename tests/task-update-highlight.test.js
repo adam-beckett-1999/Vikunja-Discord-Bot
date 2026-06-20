@@ -41,14 +41,14 @@ describe('task update highlight from task objects', () => {
     });
   });
 
-  test('returns tag add/remove details when labels changed', () => {
+  test('returns label add/remove details when labels changed', () => {
     const highlight = getTaskUpdateHighlightFromTasks(
       { labels: [{ id: 1, title: 'bug' }] },
       { labels: [{ id: 1, title: 'bug' }, { id: 2, title: 'backend' }] }
     );
 
     assert.deepStrictEqual(highlight, {
-      field: 'Tags',
+      field: 'Labels',
       before: 'bug',
       after: 'backend, bug',
       added: ['backend'],
@@ -56,7 +56,7 @@ describe('task update highlight from task objects', () => {
     });
   });
 
-  test('returns null for tag-only compare when no tag changes exist', () => {
+  test('returns null for label-only compare when no label changes exist', () => {
     const highlight = getTaskUpdateHighlightFromTasks(
       { labels: [{ id: 1, title: 'bug' }] },
       { labels: [{ id: 1, title: 'bug' }] }
@@ -65,7 +65,7 @@ describe('task update highlight from task objects', () => {
     assert.strictEqual(highlight, null);
   });
 
-  test('ignores tag diff when new task payload omits tag fields and still highlights priority', () => {
+  test('ignores label diff when new task payload omits label fields and still highlights priority', () => {
     const highlight = getTaskUpdateHighlightFromTasks(
       {
         priority: 0,

@@ -98,7 +98,7 @@ describe('embed helpers – pure logic', () => {
     assert.ok(updatedField.value.includes('Old title → New title'));
   });
 
-  test('task embed renders tags with color badges', () => {
+  test('task embed renders labels with color badges', () => {
     const embed = buildTaskEmbed({
       id: 5,
       title: 'Task',
@@ -111,20 +111,20 @@ describe('embed helpers – pure logic', () => {
     });
 
     const data = embed.toJSON();
-    const tagsField = (data.fields ?? []).find((field) => field.name === 'Tags');
+    const labelsField = (data.fields ?? []).find((field) => field.name === 'Labels');
 
-    assert.ok(tagsField, 'Tags field should exist');
-    assert.ok(tagsField.value.includes('Backend'));
-    assert.ok(tagsField.value.includes('Bug'));
+    assert.ok(labelsField, 'Labels field should exist');
+    assert.ok(labelsField.value.includes('Backend'));
+    assert.ok(labelsField.value.includes('Bug'));
   });
 
-  test('task embed renders tag diff update details', () => {
+  test('task embed renders label diff update details', () => {
     const embed = buildTaskEmbed(
       { id: 6, title: 'Task', priority: 2, done: false },
       'Updated',
       'Project A',
       {
-        field: 'Tags',
+        field: 'Labels',
         before: 'bug',
         after: 'backend, bug',
         added: ['backend'],
@@ -136,7 +136,7 @@ describe('embed helpers – pure logic', () => {
     const updatedField = (data.fields ?? []).find((field) => field.name === 'Updated');
 
     assert.ok(updatedField, 'Updated field should exist');
-    assert.ok(updatedField.value.includes('**Tags**'));
+    assert.ok(updatedField.value.includes('**Labels**'));
     assert.ok(updatedField.value.includes('Added: backend'));
     assert.ok(updatedField.value.includes('Removed: none'));
   });

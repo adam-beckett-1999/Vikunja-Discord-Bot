@@ -4,7 +4,7 @@ function escapeDiscordMarkdown(value) {
   return String(value ?? '').replace(/[\\`*_~|]/g, '\\$&');
 }
 
-export function normalizeTagName(value) {
+export function normalizeLabelName(value) {
   return String(value ?? '').trim().replace(/\s+/g, ' ');
 }
 
@@ -56,7 +56,7 @@ function rgbToHsl({ r, g, b }) {
   return { h, s: s * 100, l: l * 100 };
 }
 
-export function getTagColorBadge(hex) {
+export function getLabelColorBadge(hex) {
   const rgb = parseHexColor(hex);
   if (!rgb) return '🏷️';
 
@@ -74,18 +74,18 @@ export function getTagColorBadge(hex) {
   return '🟪';
 }
 
-export function extractTaskTags(task) {
-  const rawTags = Array.isArray(task?.tags)
+export function extractTaskLabels(task) {
+  const rawLabels = Array.isArray(task?.labels)
+    ? task.labels
+    : Array.isArray(task?.tags)
     ? task.tags
-    : Array.isArray(task?.labels)
-      ? task.labels
       : [];
 
   const byName = new Map();
 
-  for (const raw of rawTags) {
+  for (const raw of rawLabels) {
     if (typeof raw === 'string') {
-      const normalized = normalizeTagName(raw);
+      const normalized = normalizeLabelName(raw);
       if (!normalized) continue;
       byName.set(normalized.toLowerCase(), {
         id: undefined,
@@ -97,7 +97,7 @@ export function extractTaskTags(task) {
 
     if (!raw || typeof raw !== 'object') continue;
 
-    const normalized = normalizeTagName(raw.title ?? raw.name ?? raw.label);
+    const normalized = normalizeLabelName(raw.title ?? raw.name ?? raw.label);
     if (!normalized) continue;
 
     const key = normalized.toLowerCase();
@@ -112,8 +112,8 @@ export function extractTaskTags(task) {
   return [...byName.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
 
-export function formatTagNameList(names, maxLength = 120) {
-  const clean = names.map((name) => escapeDiscordMarkdown(normalizeTagName(name))).filter(Boolean);
+export function formatLabelNameList(names, maxLength = 120) {
+  const clean = names.map((name) => escapeDiscordMarkdown(normalizeLabelName(name))).filter(Boolean);
   if (!clean.length) return 'none';
 
   const text = clean.join(', ');
@@ -121,19 +121,19 @@ export function formatTagNameList(names, maxLength = 120) {
   return text.slice(0, maxLength - 1).trimEnd() + '…';
 }
 
-export function formatTaskTagsForEmbed(task, maxLength = MAX_TEXT_LENGTH) {
-  const tags = extractTaskTags(task);
-  if (!tags.length) return null;
+export function formatTaskLabelsForEmbed(task, maxLength = MAX_TEXT_LENGTH) {
+  const labels = extractTaskLabels(task);
+  if (!labels.length) return null;
 
-  const lines = tags.map((tag) => getTagColorBadge(tag.color) + ' ' + escapeDiscordMarkdown(tag.name));
+  const lines = labels.map((label) => getLabelColorBadge(label.color) + ' ' + escapeDiscordMarkdown(label.name));
   const value = lines.join('\n');
   if (value.length <= maxLength) return value;
   return value.slice(0, maxLength - 1).trimEnd() + '…';
 }
 
-export function diffTaskTagNames(oldTask, newTask) {
-  const oldNames = extractTaskTags(oldTask).map((tag) => tag.name);
-  const newNames = extractTaskTags(newTask).map((tag) => tag.name);
+export function diffTaskLabelNames(oldTask, newTask) {
+  const oldNames = extractTaskLabels(oldTask).map((label) => label.name);
+  const newNames = extractTaskLabels(newTask).map((label) => label.name);
 
   const oldSet = new Set(oldNames.map((name) => name.toLowerCase()));
   const newSet = new Set(newNames.map((name) => name.toLowerCase()));
@@ -143,3 +143,11 @@ export function diffTaskTagNames(oldTask, newTask) {
 
   return { added, removed, oldNames, newNames };
 }
+
+// Backward-compatible aliases.
+export const normalizeTagName = normalizeLabelName;
+export const getTagColorBadge = getLabelColorBadge;
+export const extractTaskTags = extractTaskLabels;
+export const formatTagNameList = formatLabelNameList;
+export const formatTaskTagsForEmbed = formatTaskLabelsForEmbed;
+export const diffTaskTagNames = diffTaskLabelNames;

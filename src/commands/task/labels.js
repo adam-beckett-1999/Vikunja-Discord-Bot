@@ -1,10 +1,10 @@
 import { SlashCommandBuilder } from 'discord.js';
 import {
-  addTagToTask,
-  createTag,
-  getAllTags,
+  addLabelToTask,
+  createLabel,
+  getAllLabels,
   getTask,
-  removeTagFromTask,
+  removeLabelFromTask,
 } from '../../services/vikunja.js';
 import {
   autocompleteProjects,
@@ -16,11 +16,11 @@ import {
 import { cacheTaskSnapshot, markManualTaskUpdate } from '../../services/task-update-context.js';
 import { buildErrorEmbed, buildTaskEmbed } from '../../utils/embeds.js';
 import { getTaskUpdateHighlightFromTasks } from '../../utils/task-update-highlight.js';
-import { normalizeTagName } from '../../utils/task-tags.js';
+import { normalizeLabelName } from '../../utils/task-labels.js';
 
 export const data = new SlashCommandBuilder()
-  .setName('task-tags')
-  .setDescription('Add or remove one or more tags on a task')
+  .setName('task-labels')
+  .setDescription('Add or remove one or more labels on a task')
   .addStringOption((opt) =>
     opt.setName('project')
       .setDescription('Project containing the task')
@@ -29,25 +29,25 @@ export const data = new SlashCommandBuilder()
   )
   .addStringOption((opt) =>
     opt.setName('task')
-      .setDescription('Task to update tags for')
+      .setDescription('Task to update labels for')
       .setRequired(true)
       .setAutocomplete(true)
   )
   .addStringOption((opt) =>
     opt.setName('add')
-      .setDescription('Comma-separated tags to add (e.g. backend, urgent)')
+      .setDescription('Comma-separated labels to add (e.g. backend, urgent)')
   )
   .addStringOption((opt) =>
     opt.setName('remove')
-      .setDescription('Comma-separated tags to remove (e.g. bug, blocked)')
+      .setDescription('Comma-separated labels to remove (e.g. bug, blocked)')
   );
 
-function parseTagList(value) {
+function parseLabelList(value) {
   if (!value) return [];
   const unique = new Map();
 
   for (const item of String(value).split(',')) {
-    const normalized = normalizeTagName(item);
+    const normalized = normalizeLabelName(item);
     if (!normalized) continue;
 
     const key = normalized.toLowerCase();
@@ -59,8 +59,8 @@ function parseTagList(value) {
   return [...unique.values()];
 }
 
-function pickTaskTags(task) {
-  const rawTags = Array.isArray(task?.labels)
+function pickTaskLabels(task) {
+  const rawLabels = Array.isArray(task?.labels)
     ? task.labels
     : Array.isArray(task?.tags)
       ? task.tags
@@ -68,9 +68,9 @@ function pickTaskTags(task) {
 
   const unique = new Map();
 
-  for (const raw of rawTags) {
+  for (const raw of rawLabels) {
     if (!raw || typeof raw !== 'object') continue;
-    const name = normalizeTagName(raw.title ?? raw.name ?? raw.label);
+    const name = normalizeLabelName(raw.title ?? raw.name ?? raw.label);
     if (!name) continue;
 
     const key = name.toLowerCase();
@@ -84,18 +84,18 @@ function pickTaskTags(task) {
   return [...unique.values()];
 }
 
-async function ensureGlobalTagMap() {
-  const response = await getAllTags();
-  const tags = Array.isArray(response?.data) ? response.data : [];
+async function ensureGlobalLabelMap() {
+  const response = await getAllLabels();
+  const labels = Array.isArray(response?.data) ? response.data : [];
 
   const byName = new Map();
-  for (const tag of tags) {
-    const name = normalizeTagName(tag?.title ?? tag?.name ?? tag?.label);
+  for (const label of labels) {
+    const name = normalizeLabelName(label?.title ?? label?.name ?? label?.label);
     if (!name) continue;
     byName.set(name.toLowerCase(), {
-      id: tag.id,
+      id: label.id,
       title: name,
-      hex_color: tag.hex_color ?? tag.hexColor ?? tag.color,
+      hex_color: label.hex_color ?? label.hexColor ?? label.color,
     });
   }
 
@@ -113,12 +113,12 @@ export async function execute(interaction) {
   const addRaw = interaction.options.getString('add');
   const removeRaw = interaction.options.getString('remove');
 
-  const toAdd = parseTagList(addRaw);
-  const toRemove = parseTagList(removeRaw);
+  const toAdd = parseLabelList(addRaw);
+  const toRemove = parseLabelList(removeRaw);
 
   if (!toAdd.length && !toRemove.length) {
     await interaction.editReply({
-      embeds: [buildErrorEmbed('Provide at least one tag in `add` or `remove`.')],
+      embeds: [buildErrorEmbed('Provide at least one label in `add` or `remove`.')],
     });
     return;
   }
@@ -126,7 +126,7 @@ export async function execute(interaction) {
   const overlapping = toAdd.filter((name) => toRemove.some((r) => r.toLowerCase() === name.toLowerCase()));
   if (overlapping.length) {
     await interaction.editReply({
-      embeds: [buildErrorEmbed('The same tag cannot be added and removed in one command: ' + overlapping.join(', '))],
+      embeds: [buildErrorEmbed('The same label cannot be added and removed in one command: ' + overlapping.join(', '))],
     });
     return;
   }
@@ -150,55 +150,55 @@ export async function execute(interaction) {
   try {
     const currentTaskResponse = await getTask(task.id);
     const currentTask = currentTaskResponse.data;
-    const currentTags = pickTaskTags(currentTask);
-    const currentByName = new Map(currentTags.map((tag) => [tag.title.toLowerCase(), tag]));
+    const currentLabels = pickTaskLabels(currentTask);
+    const currentByName = new Map(currentLabels.map((label) => [label.title.toLowerCase(), label]));
 
-    const removeTagIds = toRemove
+    const removeLabelIds = toRemove
       .map((name) => currentByName.get(name.toLowerCase())?.id)
       .filter((id) => Number.isFinite(Number(id)));
 
-    let globalTagByName = await ensureGlobalTagMap().catch(() => new Map());
-    const addTagIds = [];
+    let globalLabelByName = await ensureGlobalLabelMap().catch(() => new Map());
+    const addLabelIds = [];
 
     for (const addName of toAdd) {
       const key = addName.toLowerCase();
       if (currentByName.has(key)) continue;
 
-      let tag = globalTagByName.get(key);
-      if (!tag) {
-        const createResponse = await createTag(addName);
+      let label = globalLabelByName.get(key);
+      if (!label) {
+        const createResponse = await createLabel(addName);
         const created = createResponse?.data ?? {};
-        tag = {
+        label = {
           id: created.id,
-          title: normalizeTagName(created.title ?? created.name ?? addName),
+          title: normalizeLabelName(created.title ?? created.name ?? addName),
           hex_color: created.hex_color ?? created.hexColor ?? created.color,
         };
 
-        if (!tag.id) {
-          globalTagByName = await ensureGlobalTagMap();
-          tag = globalTagByName.get(key);
+        if (!label.id) {
+          globalLabelByName = await ensureGlobalLabelMap();
+          label = globalLabelByName.get(key);
         }
       }
 
-      if (!tag?.id) {
-        throw new Error('Could not resolve created tag id for "' + addName + '".');
+      if (!label?.id) {
+        throw new Error('Could not resolve created label id for "' + addName + '".');
       }
 
-      addTagIds.push(Number(tag.id));
+      addLabelIds.push(Number(label.id));
     }
 
-    const expectedWebhookUpdates = removeTagIds.length + addTagIds.length;
+    const expectedWebhookUpdates = removeLabelIds.length + addLabelIds.length;
     if (expectedWebhookUpdates > 0) {
       // Suppress all webhook task.updated echoes generated by this command batch.
       markManualTaskUpdate(task.id, expectedWebhookUpdates);
     }
 
-    for (const tagId of removeTagIds) {
-      await removeTagFromTask(task.id, tagId);
+    for (const labelId of removeLabelIds) {
+      await removeLabelFromTask(task.id, labelId);
     }
 
-    for (const tagId of addTagIds) {
-      await addTagToTask(task.id, tagId);
+    for (const labelId of addLabelIds) {
+      await addLabelToTask(task.id, labelId);
     }
 
     const updatedTask = (await getTask(task.id)).data;
@@ -211,7 +211,7 @@ export async function execute(interaction) {
     });
   } catch (err) {
     const msg = err.response?.data?.message ?? err.message;
-    await interaction.editReply({ embeds: [buildErrorEmbed('Failed to update task tags: ' + msg)] });
+    await interaction.editReply({ embeds: [buildErrorEmbed('Failed to update task labels: ' + msg)] });
   }
 }
 

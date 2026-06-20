@@ -1,4 +1,4 @@
-import { diffTaskTagNames, formatTagNameList } from './task-tags.js';
+import { diffTaskLabelNames, formatLabelNameList } from './task-labels.js';
 import { formatTaskDescription } from './embeds.js';
 
 const MAX_UPDATED_FIELD_VALUE_LENGTH = 120;
@@ -42,20 +42,20 @@ export function getTaskUpdateHighlightFromTasks(oldTask, task) {
     return null;
   }
 
-  const oldHasTagField = Object.hasOwn(oldTask, 'tags') || Object.hasOwn(oldTask, 'labels');
-  const newHasTagField = Object.hasOwn(task, 'tags') || Object.hasOwn(task, 'labels');
+  const oldHasLabelField = Object.hasOwn(oldTask, 'tags') || Object.hasOwn(oldTask, 'labels');
+  const newHasLabelField = Object.hasOwn(task, 'tags') || Object.hasOwn(task, 'labels');
 
-  // Only compare tags when both snapshots explicitly include tag fields.
-  // This avoids false "all tags removed" highlights from partial update payloads.
-  if (oldHasTagField && newHasTagField) {
-    const tagDiff = diffTaskTagNames(oldTask, task);
-    if (tagDiff.added.length || tagDiff.removed.length) {
+  // Only compare labels when both snapshots explicitly include label fields.
+  // This avoids false "all labels removed" highlights from partial update payloads.
+  if (oldHasLabelField && newHasLabelField) {
+    const labelDiff = diffTaskLabelNames(oldTask, task);
+    if (labelDiff.added.length || labelDiff.removed.length) {
       return {
-        field: 'Tags',
-        before: formatTagNameList(tagDiff.oldNames),
-        after: formatTagNameList(tagDiff.newNames),
-        added: tagDiff.added,
-        removed: tagDiff.removed,
+        field: 'Labels',
+        before: formatLabelNameList(labelDiff.oldNames),
+        after: formatLabelNameList(labelDiff.newNames),
+        added: labelDiff.added,
+        removed: labelDiff.removed,
       };
     }
   }
