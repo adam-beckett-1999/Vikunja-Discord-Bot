@@ -2,7 +2,7 @@ import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   DEFAULT_WEBHOOK_EVENTS,
-  autocompleteWebhookEventsInput,
+  autocompleteWebhookEventToken,
   parseWebhookEventsInput,
 } from '../src/services/webhook-events.js';
 
@@ -30,18 +30,17 @@ describe('webhook event parsing', () => {
 });
 
 describe('webhook event autocomplete', () => {
-  test('suggests values for the current comma-separated token', () => {
-    const choices = autocompleteWebhookEventsInput('task.created, task.co');
+  test('suggests values for a single event token', () => {
+    const choices = autocompleteWebhookEventToken('task.co');
 
     assert.ok(choices.length > 0);
-    assert.ok(choices.every((choice) => choice.value.startsWith('task.created, ')));
-    assert.ok(choices.some((choice) => choice.value.endsWith('task.comment.created, ')));
+    assert.ok(choices.every((choice) => !choice.value.includes(',')));
+    assert.ok(choices.some((choice) => choice.value === 'task.comment.created'));
   });
 
-  test('adds trailing comma to support selecting another event', () => {
-    const firstPick = autocompleteWebhookEventsInput('task.cre')[0];
+  test('returns direct event token values', () => {
+    const firstPick = autocompleteWebhookEventToken('task.cre')[0];
 
-    assert.ok(firstPick.value.endsWith(', '));
-    assert.ok(firstPick.value.startsWith('task.created'));
+    assert.strictEqual(firstPick.value, firstPick.name);
   });
 });

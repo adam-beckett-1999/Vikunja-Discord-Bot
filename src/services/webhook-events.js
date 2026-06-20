@@ -60,30 +60,19 @@ export function parseWebhookEventsInput(rawInput) {
 }
 
 /**
- * Build autocomplete choices for the webhook events option.
- *
- * Supports comma-separated input by only completing the token currently being
- * typed and preserving previously-entered values.
+ * Build autocomplete choices for a single event token option.
  *
  * @param {string} currentValue
  * @returns {Array<{name: string, value: string}>}
  */
-export function autocompleteWebhookEventsInput(currentValue) {
-  const value = currentValue ?? '';
-  const commaIndex = value.lastIndexOf(',');
+export function autocompleteWebhookEventToken(currentValue) {
+  const query = (currentValue ?? '').trim().toLowerCase();
 
-  const prefix = commaIndex >= 0
-    ? value.slice(0, commaIndex + 1).replace(/\s*$/, ' ')
-    : '';
-  const query = (commaIndex >= 0 ? value.slice(commaIndex + 1) : value).trim().toLowerCase();
-
-  const filtered = WEBHOOK_EVENT_SUGGESTIONS
+  return WEBHOOK_EVENT_SUGGESTIONS
     .filter((eventName) => !query || eventName.toLowerCase().includes(query))
-    .slice(0, 25);
-
-  return filtered.map((eventName) => ({
-    name: eventName,
-    // Add trailing comma+space so users can keep selecting multiple events.
-    value: (prefix ? prefix + eventName : eventName) + ', ',
-  }));
+    .slice(0, 25)
+    .map((eventName) => ({
+      name: eventName,
+      value: eventName,
+    }));
 }

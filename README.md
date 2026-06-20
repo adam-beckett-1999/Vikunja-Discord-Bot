@@ -88,11 +88,11 @@ The bot logs in to Discord and starts the webhook HTTP server on `WEBHOOK_PORT`.
 Once the bot is running and accessible at a public URL, use the Discord slash command:
 
 ```
-/webhook-register project:<project_name> url:https://your-bot.example.com/webhook events:task.created, task.updated, task.comment.created
+/webhook-register project:<project_name> url:https://your-bot.example.com/webhook event1:task.created event2:task.updated event3:task.comment.created
 ```
 
-The `events` option is optional. If omitted, the default lifecycle events are used: `task.created`, `task.updated`, and `task.deleted`.
-When provided, use a comma-separated list to control which Vikunja webhook events are delivered to Discord.
+The event options (`event1` to `event5`) are optional. If omitted, the default lifecycle events are used: `task.created`, `task.updated`, and `task.deleted`.
+When provided, set one event per option to control which Vikunja webhook events are delivered to Discord.
 Vikunja will POST the selected events to the bot, which forwards them as Discord embeds to your `NOTIFICATION_CHANNEL_ID`.
 If `WEBHOOK_SECRET` is set, `/webhook-register` will include that same secret when creating the webhook so incoming deliveries can pass signature verification.
 
