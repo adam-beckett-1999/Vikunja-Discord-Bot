@@ -58,7 +58,9 @@ export function cacheTaskSnapshot(task) {
   if (taskId === undefined) return;
   if (!task || typeof task !== 'object') return;
 
-  taskSnapshotCache.set(String(taskId), { ...task });
+  const key = String(taskId);
+  const previous = taskSnapshotCache.get(key) ?? {};
+  taskSnapshotCache.set(key, { ...previous, ...task });
 }
 
 /**

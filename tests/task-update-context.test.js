@@ -27,4 +27,17 @@ describe('task update context', () => {
     clearTaskSnapshot(99);
     assert.strictEqual(getCachedTaskSnapshot(99), undefined);
   });
+
+  test('task snapshot cache merges partial task payloads', () => {
+    cacheTaskSnapshot({ id: 77, title: 'Initial title', priority: 2 });
+    cacheTaskSnapshot({ id: 77, done: true });
+
+    const cached = getCachedTaskSnapshot(77);
+    assert.ok(cached);
+    assert.strictEqual(cached.title, 'Initial title');
+    assert.strictEqual(cached.priority, 2);
+    assert.strictEqual(cached.done, true);
+
+    clearTaskSnapshot(77);
+  });
 });

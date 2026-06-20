@@ -1,6 +1,7 @@
 import express from 'express';
 import crypto from 'node:crypto';
 import config from '../config.js';
+import { getTask } from '../services/vikunja.js';
 import { buildTaskEmbed } from '../utils/embeds.js';
 import {
   cacheTaskSnapshot,
@@ -143,6 +144,8 @@ async function postNotification(discordClient, eventType, payload) {
     return;
   }
 
+  let taskForEmbed = task;
+
   let embed;
   if (task && eventType === 'task.deleted') {
     // On deletion, the task may only have an ID – build a minimal embed.
@@ -158,11 +161,23 @@ async function postNotification(discordClient, eventType, payload) {
     let updateHighlight = getTaskUpdateHighlight(eventType, payload, task);
 
     if (!updateHighlight && eventType === 'task.updated' && task.id !== undefined) {
-      updateHighlight = getTaskUpdateHighlightFromTasks(getCachedTaskSnapshot(task.id), task);
+      const previousTask = getCachedTaskSnapshot(task.id);
+
+      if (previousTask) {
+        // Vikunja update payloads can be partial. Fetch full latest state so we
+        // can still produce a useful before/after highlight when old_task is missing.
+        const latestTask = await getTask(task.id)
+          .then((res) => res.data)
+          .catch(() => null);
+
+        const candidateTask = latestTask ?? task;
+        updateHighlight = getTaskUpdateHighlightFromTasks(previousTask, candidateTask);
+        taskForEmbed = candidateTask;
+      }
     }
 
-    embed = buildTaskEmbed(task, getEventActionLabel(eventType), undefined, updateHighlight);
-    cacheTaskSnapshot(task);
+    embed = buildTaskEmbed(taskForEmbed, getEventActionLabel(eventType), undefined, updateHighlight);
+    cacheTaskSnapshot(taskForEmbed);
   } else {
     embed = buildGenericEventEmbed(eventType, payload);
   }
