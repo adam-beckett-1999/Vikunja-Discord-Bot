@@ -97,6 +97,49 @@ describe('embed helpers – pure logic', () => {
     assert.ok(updatedField.value.includes('**Title**'));
     assert.ok(updatedField.value.includes('Old title → New title'));
   });
+
+  test('task embed renders tags with color badges', () => {
+    const embed = buildTaskEmbed({
+      id: 5,
+      title: 'Task',
+      priority: 1,
+      done: false,
+      labels: [
+        { id: 11, title: 'Backend', hex_color: '#0f9d58' },
+        { id: 12, title: 'Bug', hex_color: '#db4437' },
+      ],
+    });
+
+    const data = embed.toJSON();
+    const tagsField = (data.fields ?? []).find((field) => field.name === 'Tags');
+
+    assert.ok(tagsField, 'Tags field should exist');
+    assert.ok(tagsField.value.includes('Backend'));
+    assert.ok(tagsField.value.includes('Bug'));
+  });
+
+  test('task embed renders tag diff update details', () => {
+    const embed = buildTaskEmbed(
+      { id: 6, title: 'Task', priority: 2, done: false },
+      'Updated',
+      'Project A',
+      {
+        field: 'Tags',
+        before: 'bug',
+        after: 'backend, bug',
+        added: ['backend'],
+        removed: [],
+      }
+    );
+
+    const data = embed.toJSON();
+    const updatedField = (data.fields ?? []).find((field) => field.name === 'Updated');
+
+    assert.ok(updatedField, 'Updated field should exist');
+    assert.ok(updatedField.value.includes('**Tags**'));
+    assert.ok(updatedField.value.includes('Added: backend'));
+    assert.ok(updatedField.value.includes('Removed: none'));
+  });
 });
 
 describe('config parsing helpers', () => {

@@ -1,3 +1,5 @@
+import { diffTaskTagNames, formatTagNameList } from './task-tags.js';
+
 const MAX_UPDATED_FIELD_VALUE_LENGTH = 120;
 
 /**
@@ -29,6 +31,22 @@ export function getTaskUpdateHighlightFromPayload(eventType, payload, task) {
 export function getTaskUpdateHighlightFromTasks(oldTask, task) {
   if (!oldTask || typeof oldTask !== 'object' || !task || typeof task !== 'object') {
     return null;
+  }
+
+  const oldHasTags = Array.isArray(oldTask?.tags) || Array.isArray(oldTask?.labels);
+  const newHasTags = Array.isArray(task?.tags) || Array.isArray(task?.labels);
+
+  if (oldHasTags || newHasTags) {
+    const tagDiff = diffTaskTagNames(oldTask, task);
+    if (tagDiff.added.length || tagDiff.removed.length) {
+      return {
+        field: 'Tags',
+        before: formatTagNameList(tagDiff.oldNames),
+        after: formatTagNameList(tagDiff.newNames),
+        added: tagDiff.added,
+        removed: tagDiff.removed,
+      };
+    }
   }
 
   const fields = [

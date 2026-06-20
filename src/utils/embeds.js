@@ -1,4 +1,5 @@
 import { EmbedBuilder } from 'discord.js';
+import { formatTagNameList, formatTaskTagsForEmbed } from './task-tags.js';
 
 const MAX_EMBED_DESCRIPTION_LENGTH = 4096;
 
@@ -68,6 +69,11 @@ export function buildTaskEmbed(task, action, projectName, updateHighlight) {
     embed.addFields({ name: 'Project', value: String(resolvedProjectName), inline: true });
   }
 
+  const tagsFieldValue = formatTaskTagsForEmbed(task);
+  if (tagsFieldValue) {
+    embed.addFields({ name: 'Tags', value: tagsFieldValue });
+  }
+
   if (task.done) {
     embed.addFields({ name: 'Status', value: '✅ Done', inline: true });
   } else {
@@ -75,10 +81,26 @@ export function buildTaskEmbed(task, action, projectName, updateHighlight) {
   }
 
   if (updateHighlight?.field) {
+    const hasTagDiff = Array.isArray(updateHighlight.added) || Array.isArray(updateHighlight.removed);
+
+    if (hasTagDiff) {
+      const added = Array.isArray(updateHighlight.added) ? updateHighlight.added : [];
+      const removed = Array.isArray(updateHighlight.removed) ? updateHighlight.removed : [];
+
+      const lines = ['**Tags**'];
+      lines.push('Added: ' + formatTagNameList(added));
+      lines.push('Removed: ' + formatTagNameList(removed));
+
+      embed.addFields({
+        name: 'Updated',
+        value: lines.join('\n'),
+      });
+    } else {
     embed.addFields({
       name: 'Updated',
       value: '**' + updateHighlight.field + '**\n' + updateHighlight.before + ' → ' + updateHighlight.after,
     });
+    }
   }
 
   embed.setTimestamp(task.updated ? new Date(task.updated) : new Date());

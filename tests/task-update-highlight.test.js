@@ -40,6 +40,30 @@ describe('task update highlight from task objects', () => {
       after: '\\`New\\`',
     });
   });
+
+  test('returns tag add/remove details when labels changed', () => {
+    const highlight = getTaskUpdateHighlightFromTasks(
+      { labels: [{ id: 1, title: 'bug' }] },
+      { labels: [{ id: 1, title: 'bug' }, { id: 2, title: 'backend' }] }
+    );
+
+    assert.deepStrictEqual(highlight, {
+      field: 'Tags',
+      before: 'bug',
+      after: 'backend, bug',
+      added: ['backend'],
+      removed: [],
+    });
+  });
+
+  test('returns null for tag-only compare when no tag changes exist', () => {
+    const highlight = getTaskUpdateHighlightFromTasks(
+      { labels: [{ id: 1, title: 'bug' }] },
+      { labels: [{ id: 1, title: 'bug' }] }
+    );
+
+    assert.strictEqual(highlight, null);
+  });
 });
 
 describe('task update highlight from webhook payload', () => {

@@ -107,6 +107,93 @@ export async function deleteTask(taskId) {
   return vikunjaClient.delete('/tasks/' + taskId);
 }
 
+// ─── Tags / Labels ────────────────────────────────────────────────────────────
+
+function isEndpointNotFound(err) {
+  return Number(err?.response?.status) === 404;
+}
+
+async function requestFirstSuccess(operations) {
+  let lastError;
+
+  for (const operation of operations) {
+    try {
+      return await operation();
+    } catch (err) {
+      lastError = err;
+      if (!isEndpointNotFound(err)) {
+        throw err;
+      }
+    }
+  }
+
+  throw lastError;
+}
+
+/**
+ * Fetch all tags/labels available to the authenticated user.
+ * Supports Vikunja versions exposing either /labels or /tags endpoints.
+ */
+export async function getAllTags() {
+  return requestFirstSuccess([
+    () => vikunjaClient.get('/labels'),
+    () => vikunjaClient.get('/tags'),
+  ]);
+}
+
+/**
+ * Create a tag/label by name.
+ *
+ * @param {string} title
+ * @param {string|undefined} hexColor
+ */
+export async function createTag(title, hexColor) {
+  const payload = { title };
+  if (hexColor) payload.hex_color = hexColor;
+
+  return requestFirstSuccess([
+    () => vikunjaClient.put('/labels', payload),
+    () => vikunjaClient.post('/labels', payload),
+    () => vikunjaClient.put('/tags', payload),
+    () => vikunjaClient.post('/tags', payload),
+  ]);
+}
+
+/**
+ * Replace task tags/labels using the best available payload shape.
+ *
+ * @param {number} taskId
+ * @param {{id?: number|string, title?: string}[]} tags
+ */
+export async function replaceTaskTags(taskId, tags) {
+  const ids = tags
+    .map((tag) => Number(tag?.id))
+    .filter((id) => Number.isFinite(id));
+
+  const labelsPayload = ids.map((id) => ({ id }));
+  const updatePayloads = [
+    { labels: labelsPayload },
+    { labels: ids },
+    { tags: labelsPayload },
+    { tags: ids },
+  ];
+
+  let lastError;
+  for (const payload of updatePayloads) {
+    try {
+      return await updateTask(taskId, payload);
+    } catch (err) {
+      lastError = err;
+      const status = Number(err?.response?.status);
+      if (![400, 404, 422].includes(status)) {
+        throw err;
+      }
+    }
+  }
+
+  throw lastError;
+}
+
 // ─── Webhooks ─────────────────────────────────────────────────────────────────
 
 /**
