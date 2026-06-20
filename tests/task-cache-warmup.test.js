@@ -89,4 +89,76 @@ describe('task cache warm-up', () => {
     clearTaskSnapshot(3001);
     clearTaskSnapshot(3002);
   });
+
+  test('falls back to page-only requests when per_page is unsupported', async () => {
+    const calls = [];
+    const fetchPage = async (params = {}) => {
+      calls.push(params);
+      const page = params.page ?? 1;
+
+      if (Object.hasOwn(params, 'per_page')) {
+        const error = new Error('Bad Request');
+        error.response = {
+          status: 400,
+          data: { message: 'Invalid model provided: Bad Request' },
+        };
+        throw error;
+      }
+
+      if (page === 1) {
+        return { data: [{ id: 4001, title: 'A' }, { id: 4002, title: 'B' }] };
+      }
+
+      return { data: [] };
+    };
+
+    const result = await warmTaskSnapshotCache({ fetchPage, perPage: 100, logger: {} });
+
+    assert.strictEqual(result.pagesFetched, 2);
+    assert.strictEqual(result.tasksCached, 2);
+    assert.strictEqual(getCachedTaskSnapshot(4001)?.title, 'A');
+    assert.strictEqual(getCachedTaskSnapshot(4002)?.title, 'B');
+    assert.deepStrictEqual(calls.slice(0, 4), [
+      { page: 1, per_page: 100 },
+      { page: 1, per_page: 50 },
+      { page: 1, per_page: 25 },
+      { page: 1 },
+    ]);
+
+    clearTaskSnapshot(4001);
+    clearTaskSnapshot(4002);
+  });
+
+  test('falls back to unpaged request when all pagination params are rejected', async () => {
+    const calls = [];
+    const fetchPage = async (params = {}) => {
+      calls.push(params);
+
+      if (Object.keys(params).length > 0) {
+        const error = new Error('Bad Request');
+        error.response = {
+          status: 400,
+          data: { message: 'Invalid model provided: Bad Request' },
+        };
+        throw error;
+      }
+
+      return { data: [{ id: 5001, title: 'Only fallback works' }] };
+    };
+
+    const result = await warmTaskSnapshotCache({ fetchPage, perPage: 100, logger: {} });
+
+    assert.strictEqual(result.pagesFetched, 1);
+    assert.strictEqual(result.tasksCached, 1);
+    assert.strictEqual(getCachedTaskSnapshot(5001)?.title, 'Only fallback works');
+    assert.deepStrictEqual(calls.slice(0, 5), [
+      { page: 1, per_page: 100 },
+      { page: 1, per_page: 50 },
+      { page: 1, per_page: 25 },
+      { page: 1 },
+      {},
+    ]);
+
+    clearTaskSnapshot(5001);
+  });
 });
