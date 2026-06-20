@@ -2,6 +2,13 @@ import express from 'express';
 import crypto from 'node:crypto';
 import config from '../config.js';
 import { buildTaskEmbed } from '../utils/embeds.js';
+import {
+  cacheTaskSnapshot,
+  clearTaskSnapshot,
+  getCachedTaskSnapshot,
+  shouldSuppressWebhookUpdate,
+} from '../services/task-update-context.js';
+import { getTaskUpdateHighlightFromTasks } from '../utils/task-update-highlight.js';
 import { getTaskUpdateHighlightFromPayload } from '../utils/task-update-highlight.js';
 import { EmbedBuilder } from 'discord.js';
 
@@ -131,6 +138,11 @@ async function postNotification(discordClient, eventType, payload) {
 
   const task = payload.data?.task ?? payload.task ?? payload.data;
 
+  if (eventType === 'task.updated' && task?.id && shouldSuppressWebhookUpdate(task.id)) {
+    cacheTaskSnapshot(task);
+    return;
+  }
+
   let embed;
   if (task && eventType === 'task.deleted') {
     // On deletion, the task may only have an ID – build a minimal embed.
@@ -139,8 +151,18 @@ async function postNotification(discordClient, eventType, payload) {
       .setTitle('Deleted: ' + (task.title ?? 'Task ' + task.id))
       .setFooter({ text: 'Task ID: ' + task.id })
       .setTimestamp();
+    if (task.id !== undefined) {
+      clearTaskSnapshot(task.id);
+    }
   } else if (task) {
-    embed = buildTaskEmbed(task, getEventActionLabel(eventType), undefined, getTaskUpdateHighlight(eventType, payload, task));
+    let updateHighlight = getTaskUpdateHighlight(eventType, payload, task);
+
+    if (!updateHighlight && eventType === 'task.updated' && task.id !== undefined) {
+      updateHighlight = getTaskUpdateHighlightFromTasks(getCachedTaskSnapshot(task.id), task);
+    }
+
+    embed = buildTaskEmbed(task, getEventActionLabel(eventType), undefined, updateHighlight);
+    cacheTaskSnapshot(task);
   } else {
     embed = buildGenericEventEmbed(eventType, payload);
   }

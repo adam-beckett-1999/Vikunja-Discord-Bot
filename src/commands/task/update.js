@@ -7,6 +7,7 @@ import {
   resolveProjectSelection,
   resolveTaskSelection,
 } from '../../services/vikunja-lookups.js';
+import { cacheTaskSnapshot, markManualTaskUpdate } from '../../services/task-update-context.js';
 import { getTaskUpdateHighlightFromTasks } from '../../utils/task-update-highlight.js';
 import { buildTaskEmbed, buildErrorEmbed } from '../../utils/embeds.js';
 
@@ -104,6 +105,8 @@ export async function execute(interaction) {
 
   try {
     const res = await updateTask(task.id, taskData);
+    markManualTaskUpdate(task.id);
+    cacheTaskSnapshot(res.data);
     const updateHighlight = getTaskUpdateHighlightFromTasks(task, res.data);
     await interaction.editReply({ embeds: [buildTaskEmbed(res.data, 'Updated', project.title, updateHighlight)] });
   } catch (err) {
