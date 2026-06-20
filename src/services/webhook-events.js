@@ -83,6 +83,7 @@ export function autocompleteWebhookEventsInput(currentValue) {
 
   return filtered.map((eventName) => ({
     name: eventName,
-    value: prefix ? prefix + eventName : eventName,
+    // Add trailing comma+space so users can keep selecting multiple events.
+    value: (prefix ? prefix + eventName : eventName) + ', ',
   }));
 }

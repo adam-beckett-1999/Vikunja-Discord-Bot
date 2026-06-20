@@ -35,6 +35,13 @@ describe('webhook event autocomplete', () => {
 
     assert.ok(choices.length > 0);
     assert.ok(choices.every((choice) => choice.value.startsWith('task.created, ')));
-    assert.ok(choices.some((choice) => choice.value.endsWith('task.comment.created')));
+    assert.ok(choices.some((choice) => choice.value.endsWith('task.comment.created, ')));
+  });
+
+  test('adds trailing comma to support selecting another event', () => {
+    const firstPick = autocompleteWebhookEventsInput('task.cre')[0];
+
+    assert.ok(firstPick.value.endsWith(', '));
+    assert.ok(firstPick.value.startsWith('task.created'));
   });
 });
