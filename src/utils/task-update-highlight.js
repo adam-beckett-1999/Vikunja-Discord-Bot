@@ -1,4 +1,5 @@
 import { diffTaskTagNames, formatTagNameList } from './task-tags.js';
+import { formatTaskDescription } from './embeds.js';
 
 const MAX_UPDATED_FIELD_VALUE_LENGTH = 120;
 const PRIORITY_LABELS = {
@@ -114,6 +115,10 @@ function formatFieldValue(field, value) {
     if (Number.isFinite(numeric) && Object.hasOwn(PRIORITY_LABELS, numeric)) {
       return PRIORITY_LABELS[numeric];
     }
+  }
+
+  if (field === 'description' && typeof value === 'string') {
+    value = formatTaskDescription(value);
   }
 
   if (typeof value === 'boolean') return value ? 'true' : 'false';

@@ -95,6 +95,20 @@ describe('task update highlight from task objects', () => {
       after: 'High',
     });
   });
+
+  test('formats description diff values to readable text instead of raw html', () => {
+    const highlight = getTaskUpdateHighlightFromTasks(
+      { description: '<ul><li data-checked="true"><div><p>Old item</p></div></li></ul>' },
+      { description: '<ul><li data-checked="true"><div><p>New item</p></div></li></ul>' }
+    );
+
+    assert.ok(highlight);
+    assert.strictEqual(highlight.field, 'Description');
+    assert.ok(highlight.before.includes('Old item'));
+    assert.ok(highlight.after.includes('New item'));
+    assert.ok(!highlight.before.includes('<li'));
+    assert.ok(!highlight.after.includes('<li'));
+  });
 });
 
 describe('task update highlight from webhook payload', () => {
