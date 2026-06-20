@@ -1,5 +1,6 @@
 import { SlashCommandBuilder } from 'discord.js';
 import { createWebhook } from '../../services/vikunja.js';
+import config from '../../config.js';
 import { autocompleteProjects, resolveProjectSelection } from '../../services/vikunja-lookups.js';
 import { buildErrorEmbed, buildSuccessEmbed } from '../../utils/embeds.js';
 
@@ -37,11 +38,15 @@ export async function execute(interaction) {
 
   try {
     const res = await createWebhook(project.id, targetUrl);
+    const secretNote = config.webhook.secret
+      ? '\nUsing configured webhook secret for signature verification.'
+      : '';
     await interaction.editReply({
       embeds: [
         buildSuccessEmbed(
           'Webhook `' + res.data.id + '` registered on project `' + project.title + '`.\n' +
-          'Vikunja will now POST task events to `' + targetUrl + '`.'
+          'Vikunja will now POST task events to `' + targetUrl + '`.' +
+          secretNote
         ),
       ],
     });

@@ -92,6 +92,7 @@ Once the bot is running and accessible at a public URL, use the Discord slash co
 ```
 
 Vikunja will then POST `task.created`, `task.updated`, and `task.deleted` events to the bot, which will forward them as Discord embeds to your `NOTIFICATION_CHANNEL_ID`.
+If `WEBHOOK_SECRET` is set, `/webhook-register` will include that same secret when creating the webhook so incoming deliveries can pass signature verification.
 
 ---
 
