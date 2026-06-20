@@ -33,10 +33,12 @@ export function getTaskUpdateHighlightFromTasks(oldTask, task) {
     return null;
   }
 
-  const oldHasTags = Array.isArray(oldTask?.tags) || Array.isArray(oldTask?.labels);
-  const newHasTags = Array.isArray(task?.tags) || Array.isArray(task?.labels);
+  const oldHasTagField = Object.hasOwn(oldTask, 'tags') || Object.hasOwn(oldTask, 'labels');
+  const newHasTagField = Object.hasOwn(task, 'tags') || Object.hasOwn(task, 'labels');
 
-  if (oldHasTags || newHasTags) {
+  // Only compare tags when both snapshots explicitly include tag fields.
+  // This avoids false "all tags removed" highlights from partial update payloads.
+  if (oldHasTagField && newHasTagField) {
     const tagDiff = diffTaskTagNames(oldTask, task);
     if (tagDiff.added.length || tagDiff.removed.length) {
       return {

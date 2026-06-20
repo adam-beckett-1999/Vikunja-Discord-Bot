@@ -64,6 +64,24 @@ describe('task update highlight from task objects', () => {
 
     assert.strictEqual(highlight, null);
   });
+
+  test('ignores tag diff when new task payload omits tag fields and still highlights priority', () => {
+    const highlight = getTaskUpdateHighlightFromTasks(
+      {
+        priority: 0,
+        labels: [{ id: 1, title: 'container' }, { id: 2, title: 'docker' }],
+      },
+      {
+        priority: 2,
+      }
+    );
+
+    assert.deepStrictEqual(highlight, {
+      field: 'Priority',
+      before: '0',
+      after: '2',
+    });
+  });
 });
 
 describe('task update highlight from webhook payload', () => {

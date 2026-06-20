@@ -1,5 +1,5 @@
 import { SlashCommandBuilder } from 'discord.js';
-import { updateTask } from '../../services/vikunja.js';
+import { getTask, updateTask } from '../../services/vikunja.js';
 import {
   autocompleteProjects,
   autocompleteTasks,
@@ -105,10 +105,14 @@ export async function execute(interaction) {
 
   try {
     const res = await updateTask(task.id, taskData);
+    const updatedTask = await getTask(task.id)
+      .then((response) => response.data)
+      .catch(() => res.data);
+
     markManualTaskUpdate(task.id);
-    cacheTaskSnapshot(res.data);
-    const updateHighlight = getTaskUpdateHighlightFromTasks(task, res.data);
-    await interaction.editReply({ embeds: [buildTaskEmbed(res.data, 'Updated', project.title, updateHighlight)] });
+    cacheTaskSnapshot(updatedTask);
+    const updateHighlight = getTaskUpdateHighlightFromTasks(task, updatedTask);
+    await interaction.editReply({ embeds: [buildTaskEmbed(updatedTask, 'Updated', project.title, updateHighlight)] });
   } catch (err) {
     const msg = err.response?.data?.message ?? err.message;
     await interaction.editReply({ embeds: [buildErrorEmbed('Failed to update task: ' + msg)] });
