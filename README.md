@@ -17,7 +17,7 @@ A self-hosted Discord bot that integrates with [Vikunja](https://vikunja.io) to:
 | `/task-update` | Update an existing task (title, description, due date, priority, done state) |
 | `/task-delete` | Delete a task by ID |
 | `/project-list` | List all accessible Vikunja projects |
-| `/webhook-register` | Register a Vikunja webhook for a project to send task notifications to Discord |
+| `/webhook-register` | Register a Vikunja webhook for a project and choose which events should notify Discord |
 
 **Notifications** are delivered via an embedded Express HTTP server that receives webhook POSTs from Vikunja and forwards them to a configured Discord channel.
 
@@ -88,10 +88,12 @@ The bot logs in to Discord and starts the webhook HTTP server on `WEBHOOK_PORT`.
 Once the bot is running and accessible at a public URL, use the Discord slash command:
 
 ```
-/webhook-register project:<project_id> url:https://your-bot.example.com/webhook
+/webhook-register project:<project_name> url:https://your-bot.example.com/webhook events:task.created, task.updated, task.comment.created
 ```
 
-Vikunja will then POST `task.created`, `task.updated`, and `task.deleted` events to the bot, which will forward them as Discord embeds to your `NOTIFICATION_CHANNEL_ID`.
+The `events` option is optional. If omitted, the default lifecycle events are used: `task.created`, `task.updated`, and `task.deleted`.
+When provided, use a comma-separated list to control which Vikunja webhook events are delivered to Discord.
+Vikunja will POST the selected events to the bot, which forwards them as Discord embeds to your `NOTIFICATION_CHANNEL_ID`.
 If `WEBHOOK_SECRET` is set, `/webhook-register` will include that same secret when creating the webhook so incoming deliveries can pass signature verification.
 
 ---
