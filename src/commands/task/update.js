@@ -11,6 +11,15 @@ import { cacheTaskSnapshot, markManualTaskUpdate } from '../../services/task-upd
 import { getTaskUpdateHighlightFromTasks } from '../../utils/task-update-highlight.js';
 import { buildTaskEmbed, buildErrorEmbed } from '../../utils/embeds.js';
 
+const PRIORITY_CHOICES = [
+  { name: 'Unset', value: '0' },
+  { name: 'Low', value: '1' },
+  { name: 'Medium', value: '2' },
+  { name: 'High', value: '3' },
+  { name: 'Urgent', value: '4' },
+  { name: 'DO NOW', value: '5' },
+];
+
 export const data = new SlashCommandBuilder()
   .setName('task-update')
   .setDescription('Update an existing Vikunja task')
@@ -38,11 +47,10 @@ export const data = new SlashCommandBuilder()
     opt.setName('due')
       .setDescription('New due date in YYYY-MM-DD format')
   )
-  .addIntegerOption((opt) =>
+  .addStringOption((opt) =>
     opt.setName('priority')
-      .setDescription('Priority: 0=Unset, 1=Low, 2=Medium, 3=High, 4=Urgent, 5=DO NOW')
-      .setMinValue(0)
-      .setMaxValue(5)
+      .setDescription('Priority')
+      .addChoices(...PRIORITY_CHOICES)
   )
   .addBooleanOption((opt) =>
     opt.setName('done')
@@ -76,7 +84,8 @@ export async function execute(interaction) {
   const title = interaction.options.getString('title') ?? undefined;
   const description = interaction.options.getString('description') ?? undefined;
   const dueRaw = interaction.options.getString('due') ?? undefined;
-  const priority = interaction.options.getInteger('priority') ?? undefined;
+  const priorityRaw = interaction.options.getString('priority') ?? undefined;
+  const priority = priorityRaw !== undefined ? Number(priorityRaw) : undefined;
   const done = interaction.options.getBoolean('done') ?? undefined;
 
   const taskData = {};
@@ -94,6 +103,13 @@ export async function execute(interaction) {
       return;
     }
     taskData.due_date = parsed.toISOString();
+  }
+
+  if (priorityRaw !== undefined && !Number.isInteger(priority)) {
+    await interaction.editReply({
+      embeds: [buildErrorEmbed('Invalid priority selected.')],
+    });
+    return;
   }
 
   if (Object.keys(taskData).length === 0) {

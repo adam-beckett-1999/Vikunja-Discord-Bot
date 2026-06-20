@@ -78,8 +78,21 @@ describe('task update highlight from task objects', () => {
 
     assert.deepStrictEqual(highlight, {
       field: 'Priority',
-      before: '0',
-      after: '2',
+      before: 'Unset',
+      after: 'Medium',
+    });
+  });
+
+  test('formats priority diff values as labels', () => {
+    const highlight = getTaskUpdateHighlightFromTasks(
+      { priority: 1 },
+      { priority: 3 }
+    );
+
+    assert.deepStrictEqual(highlight, {
+      field: 'Priority',
+      before: 'Low',
+      after: 'High',
     });
   });
 });

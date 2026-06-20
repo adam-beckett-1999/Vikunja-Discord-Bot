@@ -1,6 +1,14 @@
 import { diffTaskTagNames, formatTagNameList } from './task-tags.js';
 
 const MAX_UPDATED_FIELD_VALUE_LENGTH = 120;
+const PRIORITY_LABELS = {
+  0: 'Unset',
+  1: 'Low',
+  2: 'Medium',
+  3: 'High',
+  4: 'Urgent',
+  5: 'DO NOW',
+};
 
 /**
  * Build update highlight details from a webhook payload.
@@ -69,8 +77,8 @@ export function getTaskUpdateHighlightFromTasks(oldTask, task) {
     if (!areEqualForDisplay(oldTask[field], task[field])) {
       return {
         field: formatFieldName(field),
-        before: formatFieldValue(oldTask[field]),
-        after: formatFieldValue(task[field]),
+        before: formatFieldValue(field, oldTask[field]),
+        after: formatFieldValue(field, task[field]),
       };
     }
   }
@@ -98,8 +106,16 @@ function formatComparableValue(value) {
   return JSON.stringify(value);
 }
 
-function formatFieldValue(value) {
+function formatFieldValue(field, value) {
   if (value === undefined || value === null || value === '') return 'empty';
+
+  if (field === 'priority') {
+    const numeric = Number(value);
+    if (Number.isFinite(numeric) && Object.hasOwn(PRIORITY_LABELS, numeric)) {
+      return PRIORITY_LABELS[numeric];
+    }
+  }
+
   if (typeof value === 'boolean') return value ? 'true' : 'false';
   if (typeof value === 'string') {
     const escaped = escapeDiscordMarkdown(value);
