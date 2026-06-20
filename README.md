@@ -93,6 +93,7 @@ Once the bot is running and accessible at a public URL, use the Discord slash co
 
 The `events` option is optional and free-text. If omitted, the default lifecycle events are used: `task.created`, `task.updated`, and `task.deleted`.
 When provided, enter a comma-separated list of event names.
+The field supports long values (up to 1000 characters), so you can include many event names in one command.
 
 Format example:
 

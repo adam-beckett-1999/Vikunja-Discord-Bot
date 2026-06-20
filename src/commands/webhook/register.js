@@ -25,6 +25,7 @@ export const data = new SlashCommandBuilder()
   .addStringOption((opt) =>
     opt.setName('events')
       .setDescription('Comma-separated event names. Use "help" to show examples.')
+      .setMaxLength(1000)
       .setRequired(false)
   );
 
