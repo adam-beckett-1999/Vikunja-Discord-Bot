@@ -13,6 +13,8 @@ const EVENT_ACTION = {
   'task.deleted': 'Deleted',
 };
 
+const MAX_UPDATED_FIELD_VALUE_LENGTH = 120;
+
 /**
  * Resolve the webhook event type from the Vikunja payload.
  * Vikunja documents and tests currently use `event_name`, while older or
@@ -228,8 +230,17 @@ function formatComparableValue(value) {
 function formatFieldValue(value) {
   if (value === undefined || value === null || value === '') return 'empty';
   if (typeof value === 'boolean') return value ? 'true' : 'false';
-  if (typeof value === 'string') return value.length > 120 ? value.slice(0, 117) + '…' : value;
+  if (typeof value === 'string') {
+    const escaped = escapeDiscordMarkdown(value);
+    return escaped.length > MAX_UPDATED_FIELD_VALUE_LENGTH
+      ? escaped.slice(0, MAX_UPDATED_FIELD_VALUE_LENGTH - 1).trimEnd() + '…'
+      : escaped;
+  }
   return String(value);
+}
+
+function escapeDiscordMarkdown(value) {
+  return value.replace(/[\\`*_~|]/g, '\\$&');
 }
 
 /**

@@ -71,4 +71,18 @@ describe('webhook task update highlighting', () => {
       null
     );
   });
+
+  test('escapes markdown in highlighted values', () => {
+    const highlight = getTaskUpdateHighlight(
+      'task.updated',
+      { old_task: { title: '*Old*' } },
+      { title: '`New`' }
+    );
+
+    assert.deepStrictEqual(highlight, {
+      field: 'Title',
+      before: '\\*Old\\*',
+      after: '\\`New\\`',
+    });
+  });
 });
