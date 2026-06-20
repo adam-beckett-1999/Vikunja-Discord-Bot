@@ -1,7 +1,7 @@
 import express from 'express';
 import crypto from 'node:crypto';
 import config from '../config.js';
-import { getTask } from '../services/vikunja.js';
+import { getProject, getTask } from '../services/vikunja.js';
 import { buildTaskEmbed } from '../utils/embeds.js';
 import {
   cacheTaskSnapshot,
@@ -9,6 +9,7 @@ import {
   getCachedTaskSnapshot,
   shouldSuppressWebhookUpdate,
 } from '../services/task-update-context.js';
+import { cacheProject, getCachedProjectTitle } from '../services/project-cache.js';
 import { getTaskUpdateHighlightFromTasks } from '../utils/task-update-highlight.js';
 import { getTaskUpdateHighlightFromPayload } from '../utils/task-update-highlight.js';
 import { EmbedBuilder } from 'discord.js';
@@ -176,7 +177,8 @@ async function postNotification(discordClient, eventType, payload) {
       }
     }
 
-    embed = buildTaskEmbed(taskForEmbed, getEventActionLabel(eventType), undefined, updateHighlight);
+    const projectName = await resolveProjectName(taskForEmbed);
+    embed = buildTaskEmbed(taskForEmbed, getEventActionLabel(eventType), projectName, updateHighlight);
     cacheTaskSnapshot(taskForEmbed);
   } else {
     embed = buildGenericEventEmbed(eventType, payload);
@@ -208,6 +210,35 @@ function getEventActionLabel(eventType) {
 
 export function getTaskUpdateHighlight(eventType, payload, task) {
   return getTaskUpdateHighlightFromPayload(eventType, payload, task);
+}
+
+async function resolveProjectName(task) {
+  const directTitle = task?.project?.title ?? task?.project_title;
+  if (typeof directTitle === 'string' && directTitle.trim()) {
+    cacheProject({ id: task?.project_id ?? task?.project?.id, title: directTitle });
+    return directTitle;
+  }
+
+  const projectId = task?.project_id ?? task?.project?.id;
+  if (projectId === undefined || projectId === null) {
+    return undefined;
+  }
+
+  const cached = getCachedProjectTitle(projectId);
+  if (cached) {
+    return cached;
+  }
+
+  const fetched = await getProject(projectId)
+    .then((res) => res.data)
+    .catch(() => null);
+
+  if (fetched?.title) {
+    cacheProject(fetched);
+    return fetched.title;
+  }
+
+  return undefined;
 }
 
 /**
