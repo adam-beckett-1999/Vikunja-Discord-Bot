@@ -1,6 +1,6 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { formatTaskDescription } from '../src/utils/embeds.js';
+import { buildTaskEmbed, formatTaskDescription } from '../src/utils/embeds.js';
 
 describe('embed helpers – pure logic', () => {
   test('priority label mapping covers 0–5', () => {
@@ -50,6 +50,37 @@ describe('embed helpers – pure logic', () => {
     assert.ok(formatted.includes('- [ ] Second item'));
     assert.ok(!formatted.includes('<li'));
     assert.ok(!formatted.includes('<input'));
+  });
+
+  test('task embed uses fallback text when no description fields are present', () => {
+    const embed = buildTaskEmbed({ id: 1, title: 'Task with no description', priority: 0, done: false });
+    const data = embed.toJSON();
+    assert.strictEqual(data.description, 'No description.');
+  });
+
+  test('task embed can render from alternate description_html field', () => {
+    const embed = buildTaskEmbed({
+      id: 2,
+      title: 'Task with html field',
+      priority: 0,
+      done: false,
+      description_html: '<p>Hello from html</p>',
+    });
+    const data = embed.toJSON();
+    assert.strictEqual(data.description, 'Hello from html');
+  });
+
+  test('task embed shows Project field using provided project name', () => {
+    const embed = buildTaskEmbed(
+      { id: 3, title: 'Task', priority: 0, done: false, project_id: 5 },
+      undefined,
+      'Services & Containers'
+    );
+    const data = embed.toJSON();
+    const projectField = (data.fields ?? []).find((field) => field.name === 'Project');
+
+    assert.ok(projectField, 'Project field should exist');
+    assert.strictEqual(projectField.value, 'Services & Containers');
   });
 });
 

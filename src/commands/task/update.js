@@ -103,7 +103,7 @@ export async function execute(interaction) {
 
   try {
     const res = await updateTask(task.id, taskData);
-    await interaction.editReply({ embeds: [buildTaskEmbed(res.data, 'Updated')] });
+    await interaction.editReply({ embeds: [buildTaskEmbed(res.data, 'Updated', project.title)] });
   } catch (err) {
     const msg = err.response?.data?.message ?? err.message;
     await interaction.editReply({ embeds: [buildErrorEmbed('Failed to update task: ' + msg)] });

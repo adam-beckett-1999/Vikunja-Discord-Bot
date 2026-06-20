@@ -52,7 +52,7 @@ export async function execute(interaction) {
 
   try {
     const res = await getTask(task.id);
-    await interaction.editReply({ embeds: [buildTaskEmbed(res.data)] });
+    await interaction.editReply({ embeds: [buildTaskEmbed(res.data, undefined, project.title)] });
   } catch (err) {
     const msg = err.response?.data?.message ?? err.message;
     await interaction.editReply({ embeds: [buildErrorEmbed('Could not retrieve task: ' + msg)] });

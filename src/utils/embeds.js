@@ -27,9 +27,10 @@ const PRIORITY_COLOURS = {
  *
  * @param {object} task - Raw task object from the Vikunja API.
  * @param {string} [action] - Optional action label for the embed title (e.g. "Created").
+ * @param {string} [projectName] - Optional resolved project name for clearer display.
  * @returns {EmbedBuilder}
  */
-export function buildTaskEmbed(task, action) {
+export function buildTaskEmbed(task, action, projectName) {
   const priority = task.priority ?? 0;
   const colour = PRIORITY_COLOURS[priority] ?? 0x95a5a6;
 
@@ -38,13 +39,16 @@ export function buildTaskEmbed(task, action) {
     .setTitle(action ? action + ': ' + task.title : task.title)
     .setFooter({ text: 'Task ID: ' + task.id });
 
-  if (task.description) {
-    const formatted = formatTaskDescription(task.description);
+  const rawDescription = pickTaskDescription(task);
+  if (rawDescription) {
+    const formatted = formatTaskDescription(rawDescription);
     // Truncate long descriptions to Discord's 4096 character limit for embed descriptions.
     const description = formatted.length > MAX_EMBED_DESCRIPTION_LENGTH
       ? formatted.slice(0, MAX_EMBED_DESCRIPTION_LENGTH - 1).trimEnd() + '…'
       : formatted;
     embed.setDescription(description);
+  } else {
+    embed.setDescription('No description.');
   }
 
   embed.addFields({ name: 'Priority', value: PRIORITY_LABELS[priority] ?? 'Unknown', inline: true });
@@ -54,8 +58,13 @@ export function buildTaskEmbed(task, action) {
     embed.addFields({ name: 'Due Date', value: due.toUTCString(), inline: true });
   }
 
-  if (task.project_id) {
-    embed.addFields({ name: 'Project ID', value: String(task.project_id), inline: true });
+  const resolvedProjectName = projectName
+    ?? task?.project?.title
+    ?? task?.project_title
+    ?? (task.project_id ? '#' + task.project_id : undefined);
+
+  if (resolvedProjectName) {
+    embed.addFields({ name: 'Project', value: String(resolvedProjectName), inline: true });
   }
 
   if (task.done) {
@@ -67,6 +76,23 @@ export function buildTaskEmbed(task, action) {
   embed.setTimestamp(task.updated ? new Date(task.updated) : new Date());
 
   return embed;
+}
+
+function pickTaskDescription(task) {
+  const candidates = [
+    task?.description,
+    task?.description_html,
+    task?.descriptionHtml,
+    task?.content,
+  ];
+
+  for (const candidate of candidates) {
+    if (typeof candidate === 'string' && candidate.trim()) {
+      return candidate;
+    }
+  }
+
+  return '';
 }
 
 function decodeHtmlEntities(input) {
