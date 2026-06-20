@@ -6,6 +6,12 @@ const CACHE_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 
 let cacheRefreshRunning = false;
 
+function formatCacheError(err) {
+  const status = err?.response?.status;
+  const message = err?.response?.data?.message ?? err?.message ?? 'Unknown error';
+  return status ? 'status=' + status + ' message="' + message + '"' : 'message="' + message + '"';
+}
+
 async function refreshRuntimeCaches() {
   if (cacheRefreshRunning) {
     return;
@@ -13,18 +19,28 @@ async function refreshRuntimeCaches() {
 
   cacheRefreshRunning = true;
   try {
-    const [taskResult, projectResult] = await Promise.all([
+    const [taskResult, projectResult] = await Promise.allSettled([
       warmTaskSnapshotCache(),
       warmProjectNameCache(),
     ]);
 
-    console.log(
-      '[Cache] Refresh complete: ' +
-      taskResult.tasksCached + ' task snapshots across ' + taskResult.pagesFetched +
-      ' page(s), ' + projectResult.projectsCached + ' project names cached.'
-    );
-  } catch (err) {
-    console.error('[Cache] Failed to refresh runtime caches', err);
+    if (taskResult.status === 'fulfilled') {
+      console.log(
+        '[Cache] Task snapshot refresh complete: ' +
+        taskResult.value.tasksCached + ' tasks across ' + taskResult.value.pagesFetched + ' page(s).'
+      );
+    } else {
+      console.error('[Cache] Task snapshot refresh failed: ' + formatCacheError(taskResult.reason));
+    }
+
+    if (projectResult.status === 'fulfilled') {
+      console.log(
+        '[Cache] Project name refresh complete: ' +
+        projectResult.value.projectsCached + ' project names cached.'
+      );
+    } else {
+      console.error('[Cache] Project name refresh failed: ' + formatCacheError(projectResult.reason));
+    }
   } finally {
     cacheRefreshRunning = false;
   }

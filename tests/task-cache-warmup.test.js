@@ -52,4 +52,41 @@ describe('task cache warm-up', () => {
 
     clearTaskSnapshot(2001);
   });
+
+  test('retries with smaller per_page when API rejects requested page size', async () => {
+    const calls = [];
+    const fetchPage = async ({ page, per_page }) => {
+      calls.push({ page, per_page });
+
+      if (page === 1 && per_page > 50) {
+        const error = new Error('Bad Request');
+        error.response = {
+          status: 400,
+          data: { message: 'Invalid model provided: Bad Request' },
+        };
+        throw error;
+      }
+
+      if (page === 1 && per_page === 50) {
+        return { data: [{ id: 3001, title: 'A' }, { id: 3002, title: 'B' }] };
+      }
+
+      return { data: [] };
+    };
+
+    const result = await warmTaskSnapshotCache({ fetchPage, perPage: 200, logger: {} });
+
+    assert.strictEqual(result.pagesFetched, 1);
+    assert.strictEqual(result.tasksCached, 2);
+    assert.strictEqual(getCachedTaskSnapshot(3001)?.title, 'A');
+    assert.strictEqual(getCachedTaskSnapshot(3002)?.title, 'B');
+    assert.deepStrictEqual(calls.slice(0, 3), [
+      { page: 1, per_page: 200 },
+      { page: 1, per_page: 100 },
+      { page: 1, per_page: 50 },
+    ]);
+
+    clearTaskSnapshot(3001);
+    clearTaskSnapshot(3002);
+  });
 });
