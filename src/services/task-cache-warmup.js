@@ -1,4 +1,4 @@
-import { getAllTasks } from './vikunja.js';
+import { getAllProjects, getAllTasks, getTasksByProject } from './vikunja.js';
 import { cacheTaskSnapshot } from './task-update-context.js';
 
 const DEFAULT_PER_PAGE = 100;
@@ -113,23 +113,47 @@ async function fetchPageWithPerPageFallback({ fetchPage, page, perPage, logger, 
   throw lastError;
 }
 
-/**
- * Warm the in-memory task snapshot cache by paging through accessible Vikunja
- * tasks. Intended to run on startup so first updates can still be diffed.
- *
- * @param {object} [options]
- * @param {(params: object) => Promise<{data: object[]}>} [options.fetchPage]
- * @param {number} [options.perPage]
- * @param {number} [options.maxPages]
- * @param {{info?: Function, warn?: Function, error?: Function}} [options.logger]
- * @returns {Promise<{pagesFetched: number, tasksCached: number, stoppedByMaxPages: boolean}>}
- */
-export async function warmTaskSnapshotCache(options = {}) {
-  const fetchPage = options.fetchPage ?? getAllTasks;
-  const perPage = options.perPage ?? DEFAULT_PER_PAGE;
-  const maxPages = options.maxPages ?? DEFAULT_MAX_PAGES;
-  const logger = options.logger ?? console;
+async function fetchProjectPageWithFallback({
+  fetchProjectTasks,
+  projectId,
+  page,
+  perPage,
+  supportsPerPage,
+  logger,
+}) {
+  if (!supportsPerPage) {
+    const response = await fetchProjectTasks(projectId, { page });
+    return {
+      response,
+      supportsPerPage: false,
+      effectivePerPage: undefined,
+    };
+  }
 
+  try {
+    const response = await fetchProjectTasks(projectId, { page, per_page: perPage });
+    return {
+      response,
+      supportsPerPage: true,
+      effectivePerPage: perPage,
+    };
+  } catch (err) {
+    if (!isBadRequestError(err)) throw err;
+  }
+
+  logger.warn?.(
+    '[Cache] /projects/' + projectId + '/tasks rejected per_page; continuing with page-only warm-up for this project.'
+  );
+
+  const response = await fetchProjectTasks(projectId, { page });
+  return {
+    response,
+    supportsPerPage: false,
+    effectivePerPage: undefined,
+  };
+}
+
+async function warmTaskSnapshotCacheFromAllTasks({ fetchPage, perPage, maxPages, logger }) {
   let pagesFetched = 0;
   let tasksCached = 0;
   let effectivePerPage = perPage;
@@ -185,9 +209,129 @@ export async function warmTaskSnapshotCache(options = {}) {
         return { pagesFetched, tasksCached, stoppedByMaxPages: false };
       }
     }
-
   }
 
   logger.warn?.('[Cache] Task snapshot warm-up reached max page limit (' + maxPages + ').');
   return { pagesFetched, tasksCached, stoppedByMaxPages: true };
+}
+
+async function warmTaskSnapshotCacheByProject({
+  fetchProjects,
+  fetchProjectTasks,
+  perPage,
+  maxPages,
+  logger,
+}) {
+  const projectsResponse = await fetchProjects();
+  const projects = Array.isArray(projectsResponse?.data) ? projectsResponse.data : [];
+
+  let pagesFetched = 0;
+  let tasksCached = 0;
+
+  for (const project of projects) {
+    const projectId = project?.id;
+    if (projectId === undefined || projectId === null) continue;
+
+    let supportsPerPage = true;
+    let effectivePerPage = perPage;
+    let previousCount;
+    const seenPageSignatures = new Set();
+
+    for (let page = 1; page <= maxPages; page++) {
+      const fetchResult = await fetchProjectPageWithFallback({
+        fetchProjectTasks,
+        projectId,
+        page,
+        perPage: effectivePerPage,
+        supportsPerPage,
+        logger,
+      });
+
+      supportsPerPage = fetchResult.supportsPerPage;
+      effectivePerPage = fetchResult.effectivePerPage;
+
+      const tasks = Array.isArray(fetchResult.response?.data) ? fetchResult.response.data : [];
+      const signature = buildPageSignature(tasks);
+      pagesFetched++;
+
+      for (const task of tasks) {
+        cacheTaskSnapshot(task);
+        tasksCached++;
+      }
+
+      if (tasks.length === 0) {
+        break;
+      }
+
+      if (!supportsPerPage && seenPageSignatures.has(signature)) {
+        logger.warn?.('[Cache] Detected repeated project task page result for project ' + projectId + '; stopping this project warm-up.');
+        break;
+      }
+      seenPageSignatures.add(signature);
+
+      if (effectivePerPage !== undefined && tasks.length < effectivePerPage) {
+        break;
+      }
+
+      if (!supportsPerPage && previousCount !== undefined && tasks.length < previousCount) {
+        break;
+      }
+
+      previousCount = tasks.length;
+    }
+  }
+
+  return { pagesFetched, tasksCached, stoppedByMaxPages: false };
+}
+
+/**
+ * Warm the in-memory task snapshot cache by paging through accessible Vikunja
+ * tasks. Intended to run on startup so first updates can still be diffed.
+ *
+ * @param {object} [options]
+ * @param {(params: object) => Promise<{data: object[]}>} [options.fetchPage]
+ * @param {() => Promise<{data: object[]}>} [options.fetchProjects]
+ * @param {(projectId: number|string, params: object) => Promise<{data: object[]}>} [options.fetchProjectTasks]
+ * @param {number} [options.perPage]
+ * @param {number} [options.maxPages]
+ * @param {{info?: Function, warn?: Function, error?: Function}} [options.logger]
+ * @returns {Promise<{pagesFetched: number, tasksCached: number, stoppedByMaxPages: boolean}>}
+ */
+export async function warmTaskSnapshotCache(options = {}) {
+  const fetchPage = options.fetchPage ?? getAllTasks;
+  const fetchProjects = options.fetchProjects ?? getAllProjects;
+  const fetchProjectTasks = options.fetchProjectTasks ?? getTasksByProject;
+  const perPage = options.perPage ?? DEFAULT_PER_PAGE;
+  const maxPages = options.maxPages ?? DEFAULT_MAX_PAGES;
+  const logger = options.logger ?? console;
+  try {
+    return await warmTaskSnapshotCacheFromAllTasks({
+      fetchPage,
+      perPage,
+      maxPages,
+      logger,
+    });
+  } catch (err) {
+    logger.warn?.(
+      '[Cache] /tasks/all warm-up failed (' + (err?.response?.status ?? 'error') + '). Falling back to project-by-project task warm-up.'
+    );
+  }
+
+  const fallbackResult = await warmTaskSnapshotCacheByProject({
+    fetchProjects,
+    fetchProjectTasks,
+    perPage,
+    maxPages,
+    logger,
+  });
+
+  if (fallbackResult.tasksCached === 0) {
+    throw new Error('Unable to warm task snapshot cache via /tasks/all or project task fallback.');
+  }
+
+  logger.info?.(
+    '[Cache] Project fallback warm-up cached ' + fallbackResult.tasksCached +
+    ' tasks across ' + fallbackResult.pagesFetched + ' page(s).'
+  );
+  return fallbackResult;
 }

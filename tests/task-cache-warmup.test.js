@@ -161,4 +161,52 @@ describe('task cache warm-up', () => {
 
     clearTaskSnapshot(5001);
   });
+
+  test('falls back to project task listing when /tasks/all path fails entirely', async () => {
+    const allTasksCalls = [];
+    const fetchPage = async (params = {}) => {
+      allTasksCalls.push(params);
+      const error = new Error('Bad Request');
+      error.response = {
+        status: 400,
+        data: { message: 'Invalid model provided: Bad Request' },
+      };
+      throw error;
+    };
+
+    const fetchProjects = async () => ({
+      data: [{ id: 91, title: 'Services' }, { id: 92, title: 'Automation' }],
+    });
+
+    const fetchProjectTasks = async (projectId, params = {}) => {
+      if (projectId === 91 && params.page === 1) {
+        return { data: [{ id: 6001, title: 'A' }, { id: 6002, title: 'B' }] };
+      }
+      if (projectId === 91 && params.page === 2) {
+        return { data: [] };
+      }
+      if (projectId === 92 && params.page === 1) {
+        return { data: [{ id: 6003, title: 'C' }] };
+      }
+      return { data: [] };
+    };
+
+    const result = await warmTaskSnapshotCache({
+      fetchPage,
+      fetchProjects,
+      fetchProjectTasks,
+      perPage: 2,
+      logger: {},
+    });
+
+    assert.strictEqual(result.tasksCached, 3);
+    assert.strictEqual(getCachedTaskSnapshot(6001)?.title, 'A');
+    assert.strictEqual(getCachedTaskSnapshot(6002)?.title, 'B');
+    assert.strictEqual(getCachedTaskSnapshot(6003)?.title, 'C');
+    assert.ok(allTasksCalls.length >= 3, 'Expected /tasks/all attempts before fallback');
+
+    clearTaskSnapshot(6001);
+    clearTaskSnapshot(6002);
+    clearTaskSnapshot(6003);
+  });
 });
