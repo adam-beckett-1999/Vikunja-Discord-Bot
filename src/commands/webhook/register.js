@@ -1,7 +1,8 @@
-import { SlashCommandBuilder } from 'discord.js';
+import { ChannelType, SlashCommandBuilder } from 'discord.js';
 import { createWebhook } from '../../services/vikunja.js';
 import config from '../../config.js';
 import { autocompleteProjects, resolveProjectSelection } from '../../services/vikunja-lookups.js';
+import { setProjectChannelLink } from '../../services/project-channel-links.js';
 import {
   formatWebhookEventsHelp,
   parseWebhookEventsInput,
@@ -27,6 +28,12 @@ export const data = new SlashCommandBuilder()
       .setDescription('Comma-separated event names. Use "help" to show examples.')
       .setMaxLength(1000)
       .setRequired(false)
+  )
+  .addChannelOption((opt) =>
+    opt.setName('channel')
+      .setDescription('Discord channel to receive webhook posts for this project (defaults to current channel)')
+      .addChannelTypes(ChannelType.GuildText)
+      .setRequired(false)
   );
 
 /**
@@ -38,6 +45,8 @@ export async function execute(interaction) {
   const projectSelection = interaction.options.getString('project', true);
   const targetUrl = interaction.options.getString('url', true);
   const rawEvents = interaction.options.getString('events');
+  const selectedChannel = interaction.options.getChannel('channel');
+  const targetChannelId = selectedChannel?.id ?? interaction.channelId;
 
   const requestedHelp = rawEvents?.trim().toLowerCase() === 'help';
   if (requestedHelp) {
@@ -82,11 +91,15 @@ export async function execute(interaction) {
 
   try {
     const res = await createWebhook(project.id, targetUrl, events);
+    await setProjectChannelLink(project.id, targetChannelId);
 
     const secretNote = config.webhook.secret
       ? '\nUsing configured webhook secret for signature verification.'
       : '';
     const eventsSummary = '\nEvents: `' + events.join('`, `') + '`';
+    const channelSummary = targetChannelId
+      ? '\nDiscord channel: <#' + targetChannelId + '>'
+      : '';
 
     await interaction.editReply({
       embeds: [
@@ -94,6 +107,7 @@ export async function execute(interaction) {
           'Webhook `' + res.data.id + '` registered on project `' + project.title + '`.\n' +
           'Vikunja will now POST the selected events to `' + targetUrl + '`.' +
           eventsSummary +
+          channelSummary +
           '\n\nTip: set `events:help` in this command to view format and common event meanings.' +
           secretNote
         ),
