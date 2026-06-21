@@ -74,13 +74,20 @@ services:
       - .env
     ports:
       - "3000:3000"
+      volumes:
+         - vikunja-discord-bot-data:/data
+
+volumes:
+   vikunja-discord-bot-data:
 ```
 
 Manual run:
 
 ```bash
-docker run --rm -p 3000:3000 --env-file /YOUR/FILE/LOCATION/HERE/.env adambeckett1999/vikunja-discord-bot:latest
+docker run --rm -p 3000:3000 -v vikunja-discord-bot-data:/data --env-file /YOUR/FILE/LOCATION/HERE/.env adambeckett1999/vikunja-discord-bot:latest
 ```
+
+The bot stores assignee alert links in `/data/assignee-links.json`, so the `/data` volume should be treated as part of the standard deployment.
 
 Once the container is running, the slash commands should register within discord. You may need to check the permissions on your bot within the server.
 

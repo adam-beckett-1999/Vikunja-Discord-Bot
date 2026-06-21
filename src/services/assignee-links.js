@@ -2,7 +2,7 @@ import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { extractTaskAssignees } from '../utils/task-assignees.js';
 
-const DATA_DIR = resolve(process.cwd(), 'data');
+const DATA_DIR = '/data';
 const STORE_PATH = resolve(DATA_DIR, 'assignee-links.json');
 
 const EMPTY_STORE = {
@@ -67,6 +67,15 @@ async function readStore() {
   }
 }
 
+async function writeStore(nextStore) {
+  await mkdir(DATA_DIR, { recursive: true });
+
+  const tempPath = STORE_PATH + '.tmp';
+  const json = JSON.stringify(nextStore, null, 2) + '\n';
+  await writeFile(tempPath, json, 'utf8');
+  await rename(tempPath, STORE_PATH);
+}
+
 function normalizeLink(link) {
   if (!link || typeof link !== 'object') return null;
 
@@ -89,15 +98,6 @@ function normalizeLink(link) {
   }
 
   return normalized;
-}
-
-async function writeStore(nextStore) {
-  await mkdir(DATA_DIR, { recursive: true });
-
-  const tempPath = STORE_PATH + '.tmp';
-  const json = JSON.stringify(nextStore, null, 2) + '\n';
-  await writeFile(tempPath, json, 'utf8');
-  await rename(tempPath, STORE_PATH);
 }
 
 function enqueueWrite(operation) {
