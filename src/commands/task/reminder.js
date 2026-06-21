@@ -147,7 +147,7 @@ export async function execute(interaction) {
       }
 
       const beforeTask = (await getTask(task.id)).data;
-      markManualTaskUpdate(task.id);
+        markManualTaskUpdate(task.id, 8);
       await addTaskReminder(task.id, reminderInstant);
       const updatedTask = (await getTask(task.id)).data;
       cacheTaskSnapshot(updatedTask);
@@ -172,7 +172,7 @@ export async function execute(interaction) {
       }
 
       const reminderInstant = reminders[index - 1];
-      markManualTaskUpdate(task.id);
+        markManualTaskUpdate(task.id, 8);
       await removeTaskReminder(task.id, reminderInstant);
       const updatedTask = (await getTask(task.id)).data;
       cacheTaskSnapshot(updatedTask);

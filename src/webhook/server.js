@@ -156,8 +156,11 @@ async function postNotification(discordClient, eventType, payload) {
     return;
   }
 
-  if (eventType === 'task.updated' && task?.id && shouldSuppressWebhookUpdate(task.id)) {
-    cacheTaskSnapshot(task);
+  const updateTaskId = task?.id ?? getTaskIdFromPayload(payload, task);
+  if (eventType === 'task.updated' && updateTaskId !== null && shouldSuppressWebhookUpdate(updateTaskId)) {
+    if (task) {
+      cacheTaskSnapshot(task);
+    }
     return;
   }
 

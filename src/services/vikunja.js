@@ -381,7 +381,9 @@ function normalizeReminderList(reminders) {
 }
 
 function buildReminderUpdatePayloads(reminders) {
+  const reminderObjects = reminders.map((reminder) => ({ reminder }));
   const payloads = [
+    { reminders: reminderObjects },
     { reminders },
     { reminder_dates: reminders },
     { reminderDates: reminders },
@@ -400,6 +402,7 @@ function buildReminderUpdatePayloads(reminders) {
   if (reminders.length === 1) {
     const [reminder] = reminders;
     payloads.push(
+      { reminder },
       { reminder_date: reminder },
       { reminderDate: reminder },
       { remind_at: reminder },
@@ -419,9 +422,30 @@ async function replaceTaskRemindersOnTask(taskId, task, reminders) {
       ...reminderPayload,
     }));
 
-  return requestFirstMutationSuccess(
-    payloads.map((payload) => () => updateTask(taskId, payload))
-  );
+  let lastError;
+
+  for (const payload of payloads) {
+    try {
+      await updateTask(taskId, payload);
+
+      const updatedTask = await getTask(taskId).then((res) => res.data);
+      const updatedReminders = normalizeReminderList(extractTaskReminderInstants(updatedTask));
+
+      if (areStringArraysEqual(updatedReminders, normalizedReminders)) {
+        return { data: updatedTask };
+      }
+
+      lastError = new Error('Reminder update was accepted but did not persist.');
+    } catch (err) {
+      lastError = err;
+      const status = Number(err?.response?.status);
+      if (![400, 404, 405, 422].includes(status)) {
+        throw err;
+      }
+    }
+  }
+
+  throw lastError ?? new Error('Failed to update task reminders.');
 }
 
 function buildSafeTaskUpdatePayload(task) {
@@ -460,4 +484,15 @@ function buildSafeTaskUpdatePayload(task) {
   }
 
   return payload;
+}
+
+function areStringArraysEqual(a, b) {
+  if (!Array.isArray(a) || !Array.isArray(b)) return false;
+  if (a.length !== b.length) return false;
+
+  for (let i = 0; i < a.length; i += 1) {
+    if (a[i] !== b[i]) return false;
+  }
+
+  return true;
 }
