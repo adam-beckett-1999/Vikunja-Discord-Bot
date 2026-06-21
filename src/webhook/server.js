@@ -162,11 +162,25 @@ async function postNotification(discordClient, eventType, payload) {
     }
   } else if (task) {
     if (eventType === 'task.reminder.fired') {
-      const projectName = await resolveProjectName(task);
-      const reminderInstant = extractReminderInstantFromPayload(payload, task);
-      embed = buildReminderFiredEmbed(task, projectName, reminderInstant, payload?.time);
+      let reminderTask = task;
+      let mentionedUserIds = await getMappedDiscordUserIdsForTask(reminderTask);
 
-      const mentionedUserIds = await getMappedDiscordUserIdsForTask(task);
+      // Reminder-fired payloads can omit assignee arrays; retry with full task details.
+      if (!mentionedUserIds.length && task.id !== undefined) {
+        const latestTask = await getTask(task.id)
+          .then((res) => res.data)
+          .catch(() => null);
+
+        if (latestTask) {
+          reminderTask = latestTask;
+          mentionedUserIds = await getMappedDiscordUserIdsForTask(reminderTask);
+        }
+      }
+
+      const projectName = await resolveProjectName(reminderTask);
+      const reminderInstant = extractReminderInstantFromPayload(payload, reminderTask);
+      embed = buildReminderFiredEmbed(reminderTask, projectName, reminderInstant, payload?.time);
+
       const mentionContent = mentionedUserIds.map((id) => '<@' + id + '>').join(' ');
 
       await channel.send({
@@ -177,7 +191,7 @@ async function postNotification(discordClient, eventType, payload) {
           : undefined,
       });
 
-      cacheTaskSnapshot(taskForEmbed);
+      cacheTaskSnapshot(reminderTask);
       return;
     }
 
