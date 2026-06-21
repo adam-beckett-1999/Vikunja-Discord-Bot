@@ -96,7 +96,7 @@ Create a new proxy forwarding to the IP and port of the bot container, and use t
 /webhook-register project:<project_name> url:https://your-bot.example.com/webhook events:task.created, task.updated, task.comment.created
 ```
 
-The `events` option is optional and free-text. If omitted, the default lifecycle events are used: `task.created`, `task.updated`, and `task.deleted`.
+The `events` option is optional and free-text. If omitted, the default lifecycle events are used: `task.created`, `task.updated`, `task.deleted`, and `task.reminder.fired`.
 When provided, enter a comma-separated list of event names. The supports event types are listed below.
 
 Format example:

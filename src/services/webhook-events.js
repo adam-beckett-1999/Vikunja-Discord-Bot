@@ -1,4 +1,4 @@
-export const DEFAULT_WEBHOOK_EVENTS = ['task.created', 'task.updated', 'task.deleted'];
+export const DEFAULT_WEBHOOK_EVENTS = ['task.created', 'task.updated', 'task.deleted', 'task.reminder.fired'];
 
 // Event list aligned with the Vikunja webhook UI shown by the user.
 export const WEBHOOK_EVENT_SUGGESTIONS = [
@@ -100,7 +100,7 @@ export function formatWebhookEventsHelp() {
   const lines = [
     'Format: comma-separated event names.',
     'Example: `task.created, task.updated, task.comment.created`',
-    'If omitted, defaults are: `task.created`, `task.updated`, `task.deleted`.',
+    'If omitted, defaults are: `task.created`, `task.updated`, `task.deleted`, `task.reminder.fired`.',
     'Only the supported event names below are accepted.',
     '',
     'Supported events:',
