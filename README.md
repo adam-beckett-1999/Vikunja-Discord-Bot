@@ -14,6 +14,7 @@ Self-hosted Discord bot for Vikunja.
 - `/alert-assignee` lets you manage who gets pinged for reminder alerts (`link`, `unlink`, `list`).
 - Vikunja sends events to the bot webhook endpoint.
 - The bot posts those events to the mapped Discord channel for the matching project.
+- Task embeds include an `Open` link button that jumps straight to the task in your Vikunja web UI.
 - If `WEBHOOK_SECRET` is set, the bot verifies incoming webhook signatures.
 
 ## What you need

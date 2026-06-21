@@ -14,7 +14,7 @@ import {
   resolveTaskSelection,
 } from '../../services/vikunja-lookups.js';
 import { cacheTaskSnapshot, markManualTaskUpdate } from '../../services/task-update-context.js';
-import { buildErrorEmbed, buildTaskEmbed } from '../../utils/embeds.js';
+import { buildErrorEmbed, buildTaskEmbed, buildTaskOpenLinkComponents } from '../../utils/embeds.js';
 import { getTaskUpdateHighlightFromTasks } from '../../utils/task-update-highlight.js';
 import { normalizeLabelName } from '../../utils/task-labels.js';
 
@@ -208,6 +208,7 @@ export async function execute(interaction) {
     const updateHighlight = getTaskUpdateHighlightFromTasks(currentTask, updatedTask);
     await interaction.editReply({
       embeds: [buildTaskEmbed(updatedTask, 'Updated', project.title, updateHighlight)],
+      components: buildTaskOpenLinkComponents(updatedTask),
     });
   } catch (err) {
     const msg = err.response?.data?.message ?? err.message;

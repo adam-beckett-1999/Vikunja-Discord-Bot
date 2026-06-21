@@ -7,7 +7,7 @@ import {
   resolveProjectSelection,
   resolveTaskSelection,
 } from '../../services/vikunja-lookups.js';
-import { buildTaskEmbed, buildErrorEmbed } from '../../utils/embeds.js';
+import { buildTaskEmbed, buildErrorEmbed, buildTaskOpenLinkComponents } from '../../utils/embeds.js';
 
 export const data = new SlashCommandBuilder()
   .setName('task-get')
@@ -52,7 +52,10 @@ export async function execute(interaction) {
 
   try {
     const res = await getTask(task.id);
-    await interaction.editReply({ embeds: [buildTaskEmbed(res.data, undefined, project.title)] });
+    await interaction.editReply({
+      embeds: [buildTaskEmbed(res.data, undefined, project.title)],
+      components: buildTaskOpenLinkComponents(res.data),
+    });
   } catch (err) {
     const msg = err.response?.data?.message ?? err.message;
     await interaction.editReply({ embeds: [buildErrorEmbed('Could not retrieve task: ' + msg)] });

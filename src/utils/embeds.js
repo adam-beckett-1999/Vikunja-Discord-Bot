@@ -1,4 +1,9 @@
-import { EmbedBuilder } from 'discord.js';
+import {
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  EmbedBuilder,
+} from 'discord.js';
 import { DateTime } from 'luxon';
 import config from '../config.js';
 import { formatLabelNameList, formatTaskLabelsForEmbed } from './task-labels.js';
@@ -331,4 +336,57 @@ export function buildTaskListEmbed(tasks, title) {
   }
 
   return embed;
+}
+
+/**
+ * Build an Open button component row for a task if a valid Vikunja base URL is configured.
+ *
+ * @param {object} task
+ * @returns {ActionRowBuilder<ButtonBuilder>[]|undefined}
+ */
+export function buildTaskOpenLinkComponents(task) {
+  const taskUrl = buildTaskUrl(task);
+  if (!taskUrl) return undefined;
+
+  const row = new ActionRowBuilder()
+    .addComponents(
+      new ButtonBuilder()
+        .setLabel('Open')
+        .setStyle(ButtonStyle.Link)
+        .setURL(taskUrl)
+    );
+
+  return [row];
+}
+
+/**
+ * Resolve the Vikunja web URL for a task.
+ * Standard Vikunja frontend route is /tasks/:id.
+ *
+ * @param {object} task
+ * @returns {string|null}
+ */
+export function buildTaskUrl(task) {
+  const taskId = Number(task?.id);
+  if (!Number.isFinite(taskId)) return null;
+
+  const webBaseUrl = resolveVikunjaWebBaseUrl();
+  if (!webBaseUrl) return null;
+
+  return webBaseUrl + '/tasks/' + taskId;
+}
+
+function resolveVikunjaWebBaseUrl() {
+  const raw = String(config?.vikunja?.baseUrl ?? '').trim();
+  if (!raw) return null;
+
+  // Allow users to configure either the web root or API root.
+  const normalized = raw.replace(/\/$/, '').replace(/\/api(?:\/v\d+)?$/i, '');
+
+  try {
+    const parsed = new URL(normalized);
+    return parsed.origin + parsed.pathname.replace(/\/$/, '');
+  } catch {
+    return null;
+  }
 }

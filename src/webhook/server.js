@@ -2,7 +2,7 @@ import express from 'express';
 import crypto from 'node:crypto';
 import config from '../config.js';
 import { getProject, getTask } from '../services/vikunja.js';
-import { buildReminderFiredEmbed, buildTaskEmbed } from '../utils/embeds.js';
+import { buildReminderFiredEmbed, buildTaskEmbed, buildTaskOpenLinkComponents } from '../utils/embeds.js';
 import {
   cacheTaskSnapshot,
   clearTaskSnapshot,
@@ -203,6 +203,7 @@ async function postNotification(discordClient, eventType, payload) {
       await channel.send({
         content: mentionContent || undefined,
         embeds: [embed],
+        components: buildTaskOpenLinkComponents(reminderTask),
         allowedMentions: mentionedUserIds.length
           ? { users: mentionedUserIds }
           : undefined,
@@ -237,7 +238,10 @@ async function postNotification(discordClient, eventType, payload) {
     embed = buildGenericEventEmbed(eventType, payload);
   }
 
-  await channel.send({ embeds: [embed] });
+  await channel.send({
+    embeds: [embed],
+    components: taskForEmbed ? buildTaskOpenLinkComponents(taskForEmbed) : undefined,
+  });
 }
 
 async function resolveNotificationChannelId(payload, task, eventType) {

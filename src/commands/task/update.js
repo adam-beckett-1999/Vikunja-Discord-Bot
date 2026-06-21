@@ -9,7 +9,7 @@ import {
 } from '../../services/vikunja-lookups.js';
 import { cacheTaskSnapshot, markManualTaskUpdate } from '../../services/task-update-context.js';
 import { getTaskUpdateHighlightFromTasks } from '../../utils/task-update-highlight.js';
-import { buildTaskEmbed, buildErrorEmbed } from '../../utils/embeds.js';
+import { buildTaskEmbed, buildErrorEmbed, buildTaskOpenLinkComponents } from '../../utils/embeds.js';
 
 const PRIORITY_CHOICES = [
   { name: 'Unset', value: '0' },
@@ -122,7 +122,10 @@ export async function execute(interaction) {
     markManualTaskUpdate(task.id);
     cacheTaskSnapshot(updatedTask);
     const updateHighlight = getTaskUpdateHighlightFromTasks(task, updatedTask);
-    await interaction.editReply({ embeds: [buildTaskEmbed(updatedTask, 'Updated', project.title, updateHighlight)] });
+    await interaction.editReply({
+      embeds: [buildTaskEmbed(updatedTask, 'Updated', project.title, updateHighlight)],
+      components: buildTaskOpenLinkComponents(updatedTask),
+    });
   } catch (err) {
     const msg = err.response?.data?.message ?? err.message;
     await interaction.editReply({ embeds: [buildErrorEmbed('Failed to update task: ' + msg)] });
