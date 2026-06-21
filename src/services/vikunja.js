@@ -475,6 +475,10 @@ function buildSafeTaskUpdatePayload(task) {
     'repeat_mode',
     'hex_color',
     'project_id',
+    'bucket_id',
+    'position',
+    'assignees',
+    'labels',
   ];
 
   for (const fieldName of fieldNames) {
@@ -489,6 +493,16 @@ function buildSafeTaskUpdatePayload(task) {
 
   if (!payload.title) {
     throw new Error('Could not update reminders because the current task title is missing.');
+  }
+
+  // Vikunja can treat task updates as replace-like for some mutable arrays.
+  // Preserve the current task state so reminder writes only change reminders.
+  if (Object.hasOwn(task, 'bucket_id') && !Object.hasOwn(payload, 'bucket_id')) {
+    payload.bucket_id = task.bucket_id;
+  }
+
+  if (Object.hasOwn(task, 'position') && !Object.hasOwn(payload, 'position')) {
+    payload.position = task.position;
   }
 
   return payload;
