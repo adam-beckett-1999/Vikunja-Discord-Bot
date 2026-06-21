@@ -2,7 +2,7 @@ import express from 'express';
 import crypto from 'node:crypto';
 import config from '../config.js';
 import { getProject, getTask } from '../services/vikunja.js';
-import { buildTaskEmbed } from '../utils/embeds.js';
+import { buildReminderFiredEmbed, buildTaskEmbed } from '../utils/embeds.js';
 import {
   cacheTaskSnapshot,
   clearTaskSnapshot,
@@ -12,6 +12,8 @@ import {
 import { cacheProject, getCachedProjectTitle } from '../services/project-cache.js';
 import { getTaskUpdateHighlightFromTasks } from '../utils/task-update-highlight.js';
 import { getTaskUpdateHighlightFromPayload } from '../utils/task-update-highlight.js';
+import { getMappedDiscordUserIdsForTask } from '../services/assignee-links.js';
+import { extractReminderInstantFromPayload } from '../utils/task-reminders.js';
 import { EmbedBuilder } from 'discord.js';
 
 /**
@@ -159,6 +161,26 @@ async function postNotification(discordClient, eventType, payload) {
       clearTaskSnapshot(task.id);
     }
   } else if (task) {
+    if (eventType === 'task.reminder.fired') {
+      const projectName = await resolveProjectName(task);
+      const reminderInstant = extractReminderInstantFromPayload(payload, task);
+      embed = buildReminderFiredEmbed(task, projectName, reminderInstant, payload?.time);
+
+      const mentionedUserIds = await getMappedDiscordUserIdsForTask(task);
+      const mentionContent = mentionedUserIds.map((id) => '<@' + id + '>').join(' ');
+
+      await channel.send({
+        content: mentionContent || undefined,
+        embeds: [embed],
+        allowedMentions: mentionedUserIds.length
+          ? { users: mentionedUserIds }
+          : undefined,
+      });
+
+      cacheTaskSnapshot(taskForEmbed);
+      return;
+    }
+
     let updateHighlight = getTaskUpdateHighlight(eventType, payload, task);
 
     if (!updateHighlight && eventType === 'task.updated' && task.id !== undefined) {

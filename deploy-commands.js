@@ -17,7 +17,7 @@ import config from './src/config.js';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const commandBody = [];
-const commandDirs = ['task', 'project', 'webhook'];
+const commandDirs = ['task', 'project', 'webhook', 'alerts'];
 
 for (const dir of commandDirs) {
   const dirPath = resolve(__dirname, 'src', 'commands', dir);

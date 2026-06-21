@@ -26,6 +26,14 @@ const REMINDER_VALUE_KEYS = [
   'remindAt',
 ];
 
+const REMINDER_PAYLOAD_KEYS = [
+  'reminder',
+  'reminder_date',
+  'reminderDate',
+  'remind_at',
+  'remindAt',
+];
+
 export function hasReminderField(task) {
   if (!task || typeof task !== 'object') return false;
   return REMINDER_KEYS.some((key) => Object.hasOwn(task, key));
@@ -96,6 +104,27 @@ export function diffTaskReminderInstants(oldTask, newTask) {
   };
 }
 
+export function extractReminderInstantFromPayload(payload, task) {
+  const candidates = [];
+
+  for (const key of REMINDER_PAYLOAD_KEYS) {
+    candidates.push(payload?.data?.[key]);
+    candidates.push(payload?.[key]);
+  }
+
+  for (const candidate of candidates) {
+    const normalized = normalizeReminderInstant(candidate);
+    if (normalized) return normalized;
+  }
+
+  const taskReminders = extractTaskReminderInstants(task);
+  if (taskReminders.length === 1) {
+    return taskReminders[0];
+  }
+
+  return null;
+}
+
 function normalizeReminderInstant(value) {
   if (value === undefined || value === null || value === '') return null;
 
@@ -139,7 +168,7 @@ function parseNumericDate(numberValue) {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
-function formatReminderInstantForDisplay(instant) {
+export function formatReminderInstantForDisplay(instant) {
   const parsed = new Date(instant);
   if (Number.isNaN(parsed.getTime())) return String(instant);
   return parsed.toUTCString();

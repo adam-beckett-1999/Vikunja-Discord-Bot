@@ -10,6 +10,7 @@ Self-hosted Discord bot for Vikunja.
 
 - Slash commands let you create, list, view, update, and delete tasks.
 - `/webhook-register` creates a Vikunja webhook for a project.
+- `/alert-assignee-link` and `/alert-assignee-unlink` control who gets pinged for reminder alerts.
 - Vikunja sends events to the bot webhook endpoint.
 - The bot posts those events to your chosen Discord channel as embeds.
 - If `WEBHOOK_SECRET` is set, the bot verifies incoming webhook signatures.
@@ -128,6 +129,35 @@ task.created, task.updated, task.comment.created
 
 Vikunja will POST the selected events to the bot, which forwards them as Discord embeds to your `NOTIFICATION_CHANNEL_ID`.
 If `WEBHOOK_SECRET` is set, `/webhook-register` will include that same secret when creating the webhook so incoming deliveries can pass signature verification.
+
+---
+
+### Configure reminder pings by assignee
+
+Reminder notifications can now mention Discord users based on task assignees.
+
+1. Link a Vikunja assignee to a Discord user:
+
+```text
+/alert-assignee-link assignee:<assignee> discord-user:@User
+```
+
+`assignee` is global to your connected Vikunja instance.
+Autocomplete suggests known assignees discovered from tasks. You can also enter `id:<vikunja_user_id>` or `username:<vikunja_username>` manually.
+
+1. Remove a link:
+
+```text
+/alert-assignee-unlink assignee:<assignee>
+```
+
+1. Show current links:
+
+```text
+/alert-assignee-list
+```
+
+When a `task.reminder.fired` webhook is received, the bot checks task assignees and mentions any linked Discord users in the notification message.
 
 ---
 

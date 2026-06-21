@@ -19,7 +19,7 @@ const client = new Client({
 /** @type {Collection<string, {data: import('discord.js').SlashCommandBuilder, execute: Function}>} */
 const commands = new Collection();
 
-const commandDirs = ['task', 'project', 'webhook'];
+const commandDirs = ['task', 'project', 'webhook', 'alerts'];
 
 for (const dir of commandDirs) {
   const dirPath = resolve(__dirname, 'commands', dir);

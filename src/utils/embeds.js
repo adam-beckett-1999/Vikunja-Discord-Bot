@@ -114,6 +114,68 @@ export function buildTaskEmbed(task, action, projectName, updateHighlight) {
   return embed;
 }
 
+/**
+ * Build a dedicated alert embed for reminder fired webhook events.
+ *
+ * @param {object} task
+ * @param {string|undefined} projectName
+ * @param {string|null} reminderInstant
+ * @param {string|undefined} eventTime
+ * @returns {EmbedBuilder}
+ */
+export function buildReminderFiredEmbed(task, projectName, reminderInstant, eventTime) {
+  const embed = new EmbedBuilder()
+    .setColor(0xf39c12)
+    .setTitle('Reminder: ' + task.title)
+    .setFooter({ text: 'Task ID: ' + task.id });
+
+  const summary = pickTaskDescription(task);
+  if (summary) {
+    const formattedSummary = formatTaskDescription(summary);
+    embed.setDescription(formattedSummary.length > 240
+      ? formattedSummary.slice(0, 239).trimEnd() + '…'
+      : formattedSummary);
+  } else {
+    embed.setDescription('A scheduled reminder was triggered for this task.');
+  }
+
+  if (reminderInstant) {
+    const reminderDate = new Date(reminderInstant);
+    if (!Number.isNaN(reminderDate.getTime())) {
+      embed.addFields({ name: 'Reminder Time', value: reminderDate.toUTCString(), inline: true });
+    }
+  }
+
+  if (task.due_date && task.due_date !== '0001-01-01T00:00:00Z') {
+    const due = new Date(task.due_date);
+    embed.addFields({ name: 'Due Date', value: due.toUTCString(), inline: true });
+  }
+
+  const resolvedProjectName = projectName
+    ?? task?.project?.title
+    ?? task?.project_title
+    ?? (task.project_id ? '#' + task.project_id : undefined);
+
+  if (resolvedProjectName) {
+    embed.addFields({ name: 'Project', value: String(resolvedProjectName), inline: true });
+  }
+
+  embed.addFields({
+    name: 'Status',
+    value: task.done ? 'Done' : 'Pending',
+    inline: true,
+  });
+
+  const timestamp = eventTime ? new Date(eventTime) : null;
+  if (timestamp && !Number.isNaN(timestamp.getTime())) {
+    embed.setTimestamp(timestamp);
+  } else {
+    embed.setTimestamp(task.updated ? new Date(task.updated) : new Date());
+  }
+
+  return embed;
+}
+
 function pickTaskDescription(task) {
   const candidates = [
     task?.description,
