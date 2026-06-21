@@ -1,4 +1,4 @@
-import { getAllTasks } from './vikunja.js';
+import { getAllProjects, getAllTasks, getTasksByProject } from './vikunja.js';
 import {
   extractTaskAssignees,
   formatAssigneeChoiceName,
@@ -33,6 +33,20 @@ function dedupeAssignees(assignees) {
 }
 
 async function fetchAssigneesFromTasks() {
+  const fromAllTasks = await fetchAssigneesViaAllTasks().catch(() => null);
+  if (fromAllTasks && fromAllTasks.length) {
+    return fromAllTasks;
+  }
+
+  const fromProjects = await fetchAssigneesViaProjects().catch(() => null);
+  if (fromProjects && fromProjects.length) {
+    return fromProjects;
+  }
+
+  return [];
+}
+
+async function fetchAssigneesViaAllTasks() {
   const collected = [];
 
   for (let page = 1; page <= MAX_PAGES; page += 1) {
@@ -45,6 +59,32 @@ async function fetchAssigneesFromTasks() {
     }
 
     if (tasks.length < PER_PAGE) break;
+  }
+
+  return dedupeAssignees(collected);
+}
+
+async function fetchAssigneesViaProjects() {
+  const projectResponse = await getAllProjects();
+  const projects = Array.isArray(projectResponse.data) ? projectResponse.data : [];
+
+  const collected = [];
+
+  for (const project of projects) {
+    const projectId = Number(project?.id);
+    if (!Number.isFinite(projectId)) continue;
+
+    for (let page = 1; page <= MAX_PAGES; page += 1) {
+      const response = await getTasksByProject(projectId, { page, per_page: PER_PAGE });
+      const tasks = Array.isArray(response.data) ? response.data : [];
+      if (!tasks.length) break;
+
+      for (const task of tasks) {
+        collected.push(...extractTaskAssignees(task));
+      }
+
+      if (tasks.length < PER_PAGE) break;
+    }
   }
 
   return dedupeAssignees(collected);

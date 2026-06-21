@@ -18,8 +18,8 @@ export async function execute(interaction) {
 
   const assigneeSelection = interaction.options.getString('assignee', true);
 
-  const assignee = await resolveKnownAssigneeSelection(assigneeSelection)
-    ?? parseManualAssigneeSelection(assigneeSelection);
+  const knownAssignee = await resolveKnownAssigneeSelection(assigneeSelection).catch(() => null);
+  const assignee = knownAssignee ?? parseManualAssigneeSelection(assigneeSelection);
 
   if (!assignee) {
     await interaction.editReply({
