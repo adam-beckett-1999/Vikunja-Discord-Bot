@@ -1,6 +1,7 @@
 import axios from 'axios';
 import config from '../config.js';
 import { DEFAULT_WEBHOOK_EVENTS } from './webhook-events.js';
+import { extractTaskReminderInstants } from '../utils/task-reminders.js';
 
 /**
  * Axios instance pre-configured for the Vikunja REST API.
@@ -105,6 +106,47 @@ export async function updateTask(taskId, taskData) {
  */
 export async function deleteTask(taskId) {
   return vikunjaClient.delete('/tasks/' + taskId);
+}
+
+/**
+ * Replace the reminders on an existing task using the best available Vikunja
+ * payload shapes.
+ *
+ * @param {number} taskId
+ * @param {string[]} reminders
+ */
+export async function replaceTaskReminders(taskId, reminders) {
+  const normalizedReminders = normalizeReminderList(reminders);
+  const payloads = buildReminderUpdatePayloads(normalizedReminders);
+
+  return requestFirstMutationSuccess(
+    payloads.map((payload) => () => updateTask(taskId, payload))
+  );
+}
+
+/**
+ * Add a reminder to an existing task.
+ *
+ * @param {number} taskId
+ * @param {string} reminderInstant
+ */
+export async function addTaskReminder(taskId, reminderInstant) {
+  const task = await getTask(taskId).then((res) => res.data);
+  const existingReminders = extractTaskReminderInstants(task);
+  return replaceTaskReminders(taskId, [...existingReminders, reminderInstant]);
+}
+
+/**
+ * Remove a reminder from an existing task.
+ *
+ * @param {number} taskId
+ * @param {string} reminderInstant
+ */
+export async function removeTaskReminder(taskId, reminderInstant) {
+  const task = await getTask(taskId).then((res) => res.data);
+  const existingReminders = extractTaskReminderInstants(task);
+  const nextReminders = existingReminders.filter((value) => value !== reminderInstant);
+  return replaceTaskReminders(taskId, nextReminders);
 }
 
 // ─── Assignees ────────────────────────────────────────────────────────────────
@@ -335,4 +377,39 @@ export async function listWebhooks(projectId) {
  */
 export async function deleteWebhook(projectId, webhookId) {
   return vikunjaClient.delete('/projects/' + projectId + '/webhooks/' + webhookId);
+}
+
+function normalizeReminderList(reminders) {
+  const list = Array.isArray(reminders) ? reminders : [];
+  return [...new Set(list.map((value) => String(value).trim()).filter(Boolean))].sort();
+}
+
+function buildReminderUpdatePayloads(reminders) {
+  const payloads = [
+    { reminders },
+    { reminder_dates: reminders },
+    { reminderDates: reminders },
+  ];
+
+  if (reminders.length === 0) {
+    payloads.push(
+      { reminder_date: null },
+      { reminderDate: null },
+      { remind_at: null },
+      { remindAt: null }
+    );
+    return payloads;
+  }
+
+  if (reminders.length === 1) {
+    const [reminder] = reminders;
+    payloads.push(
+      { reminder_date: reminder },
+      { reminderDate: reminder },
+      { remind_at: reminder },
+      { remindAt: reminder }
+    );
+  }
+
+  return payloads;
 }

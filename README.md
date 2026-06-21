@@ -8,7 +8,7 @@ Self-hosted Discord bot for Vikunja.
 
 ## How it works
 
-- Slash commands let you create, list, view, update, delete, and manage assignees on tasks.
+- Slash commands let you create, list, view, update, delete, and manage assignees and reminders on tasks.
 - `/webhook-register` creates a Vikunja webhook for a project and can map that project to a Discord channel.
 - `/webhook-channel` lets you manage project-to-channel mappings (`set`, `remove`, `list`).
 - `/alert-assignee-link` and `/alert-assignee-unlink` control who gets pinged for reminder alerts.
@@ -52,6 +52,7 @@ Set these in `.env` in the same folder as your compose file, or ensure you inclu
 |---|---|---|
 | `DISCORD_TOKEN` | Yes | Discord bot token |
 | `DISCORD_CLIENT_ID` | Yes | Discord application client ID |
+| `BOT_TIMEZONE` | No | IANA timezone for reminder input parsing (default `UTC`) |
 | `DISCORD_GUILD_IDS` | Yes | Discord guild IDs for instant slash command registration |
 | `VIKUNJA_BASE_URL` | Yes | Vikunja base URL |
 | `VIKUNJA_API_TOKEN` | Yes | Vikunja API token |
@@ -177,6 +178,21 @@ Autocomplete suggests known assignees discovered from tasks. You can also enter 
 ```
 
 When a `task.reminder.fired` webhook is received, the bot checks task assignees and mentions any linked Discord users in the notification message.
+
+### Manage task reminders
+
+Use `/task-reminder` to work with task reminder dates directly:
+
+```text
+/task-reminder add project:<project_name> task:<task_name> at:2026-06-21 18:00
+/task-reminder list project:<project_name> task:<task_name>
+/task-reminder remove project:<project_name> task:<task_name> index:1
+```
+
+`add` expects a date and time in `YYYY-MM-DD HH:mm` format, using a 24-hour clock in the bot's local timezone.
+The timezone is controlled by `BOT_TIMEZONE` (default `UTC`).
+For example: `2026-06-21 18:00`.
+`remove` uses the reminder number shown by the `list` subcommand.
 
 ---
 

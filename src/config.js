@@ -1,6 +1,9 @@
 import 'dotenv/config';
 
 export default {
+  bot: {
+    timeZone: (process.env.BOT_TIMEZONE ?? 'UTC').trim() || 'UTC',
+  },
   discord: {
     token: process.env.DISCORD_TOKEN,
     clientId: process.env.DISCORD_CLIENT_ID,
