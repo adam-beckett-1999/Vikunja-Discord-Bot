@@ -57,6 +57,7 @@ Set these in `.env` in the same folder as your compose file, or ensure you inclu
 | `VIKUNJA_API_TOKEN` | Yes | Vikunja API token |
 | `WEBHOOK_PORT` | Yes | Webhook server port (default `3000`) |
 | `WEBHOOK_SECRET` | No | Secret used to verify incoming Vikunja webhooks |
+| `WEBHOOK_DEBUG_LOGGING` | No | Set to `true` to log webhook delivery details and raw payloads |
 | `NOTIFICATION_CHANNEL_ID` | No | Fallback Discord channel when a project mapping is missing |
 
 ---
@@ -87,8 +88,6 @@ Manual run:
 ```bash
 docker run --rm -p 3000:3000 -v vikunja-discord-bot-data:/data --env-file /YOUR/FILE/LOCATION/HERE/.env adambeckett1999/vikunja-discord-bot:latest
 ```
-
-The bot stores assignee alert links in `/data/assignee-links.json`, so the `/data` volume should be treated as part of the standard deployment.
 
 Once the container is running, the slash commands should register within discord. You may need to check the permissions on your bot within the server.
 

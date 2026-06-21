@@ -98,8 +98,13 @@ export function startWebhookServer(discordClient) {
     }
 
     const eventType = getWebhookEventType(payload);
+    const requestSummary = summarizeWebhookRequest(payload, eventType, signature);
 
-    console.log('[Webhook] Received event: ' + (eventType ?? 'unknown'));
+    console.log('[Webhook] Received event: ' + (eventType ?? 'unknown') + ' | ' + requestSummary);
+
+    if (config.webhook.debugLogging) {
+      console.log('[Webhook][debug] Raw payload: ' + rawBody);
+    }
 
     res.status(200).json({ status: 'ok' });
 
@@ -132,11 +137,11 @@ async function postNotification(discordClient, eventType, payload) {
   const task = payload.data?.task ?? payload.task ?? payload.data;
   const channelId = await resolveNotificationChannelId(payload, task, eventType);
   if (!channelId) {
-    console.warn('[Webhook] No channel mapping found and NOTIFICATION_CHANNEL_ID is not set – skipping notification.');
+    console.warn('[Webhook] No channel mapping found for payload ' + summarizeWebhookRequest(payload, eventType) + ' and NOTIFICATION_CHANNEL_ID is not set – skipping notification.');
     return;
   }
 
-  console.log('[Webhook] Routing ' + (eventType ?? 'unknown') + ' to channel ' + channelId);
+  console.log('[Webhook] Routing ' + (eventType ?? 'unknown') + ' to channel ' + channelId + ' | ' + summarizeWebhookRequest(payload, eventType));
 
   const channel = await discordClient.channels.fetch(channelId).catch(() => null);
   if (!channel || !channel.isTextBased()) {
@@ -231,6 +236,9 @@ async function resolveNotificationChannelId(payload, task, eventType) {
   if (projectId !== null) {
     const mappedChannelId = await getChannelIdForProject(projectId).catch(() => null);
     if (mappedChannelId) {
+      if (config.webhook.debugLogging) {
+        console.log('[Webhook][debug] Resolved channel ' + mappedChannelId + ' from project ' + projectId + '.');
+      }
       return mappedChannelId;
     }
 
@@ -299,6 +307,27 @@ function getTaskIdFromPayload(payload, task) {
   }
 
   return null;
+}
+
+function summarizeWebhookRequest(payload, eventType, signature) {
+  const projectId = getProjectIdFromPayload(payload);
+  const taskId = getTaskIdFromPayload(payload, payload?.data?.task ?? payload?.task ?? payload?.data);
+  const payloadKeys = summarizeKeys(payload);
+  const dataKeys = summarizeKeys(payload?.data);
+
+  return [
+    'event=' + (eventType ?? 'unknown'),
+    'projectId=' + (projectId ?? 'n/a'),
+    'taskId=' + (taskId ?? 'n/a'),
+    'payloadKeys=' + payloadKeys,
+    'dataKeys=' + dataKeys,
+    'signature=' + (signature ? 'present' : 'missing'),
+  ].join(' | ');
+}
+
+function summarizeKeys(value) {
+  if (!value || typeof value !== 'object') return 'none';
+  return Object.keys(value).sort().join(',') || 'none';
 }
 
 /**

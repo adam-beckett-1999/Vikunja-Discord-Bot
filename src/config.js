@@ -16,5 +16,6 @@ export default {
     port: parseInt(process.env.WEBHOOK_PORT ?? '3000', 10),
     secret: process.env.WEBHOOK_SECRET,
     notificationChannelId: process.env.NOTIFICATION_CHANNEL_ID,
+    debugLogging: ['1', 'true', 'yes', 'on'].includes(String(process.env.WEBHOOK_DEBUG_LOGGING ?? '').trim().toLowerCase()),
   },
 };
