@@ -13,6 +13,7 @@ import {
   resolveProjectSelection,
   resolveTaskSelection,
 } from '../../services/vikunja-lookups.js';
+import { cacheTaskSnapshot, markManualTaskUpdate } from '../../services/task-update-context.js';
 import { buildErrorEmbed, buildTaskEmbed } from '../../utils/embeds.js';
 import { extractTaskReminderInstants, formatReminderInstantForDisplay } from '../../utils/task-reminders.js';
 import { getTaskUpdateHighlightFromTasks } from '../../utils/task-update-highlight.js';
@@ -146,8 +147,10 @@ export async function execute(interaction) {
       }
 
       const beforeTask = (await getTask(task.id)).data;
+      markManualTaskUpdate(task.id);
       await addTaskReminder(task.id, reminderInstant);
       const updatedTask = (await getTask(task.id)).data;
+      cacheTaskSnapshot(updatedTask);
       const updateHighlight = getTaskUpdateHighlightFromTasks(beforeTask, updatedTask);
 
       await interaction.editReply({
@@ -169,8 +172,10 @@ export async function execute(interaction) {
       }
 
       const reminderInstant = reminders[index - 1];
+      markManualTaskUpdate(task.id);
       await removeTaskReminder(task.id, reminderInstant);
       const updatedTask = (await getTask(task.id)).data;
+      cacheTaskSnapshot(updatedTask);
       const updateHighlight = getTaskUpdateHighlightFromTasks(beforeTask, updatedTask);
 
       await interaction.editReply({

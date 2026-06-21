@@ -116,12 +116,8 @@ export async function deleteTask(taskId) {
  * @param {string[]} reminders
  */
 export async function replaceTaskReminders(taskId, reminders) {
-  const normalizedReminders = normalizeReminderList(reminders);
-  const payloads = buildReminderUpdatePayloads(normalizedReminders);
-
-  return requestFirstMutationSuccess(
-    payloads.map((payload) => () => updateTask(taskId, payload))
-  );
+  const task = await getTask(taskId).then((res) => res.data);
+  return replaceTaskRemindersOnTask(taskId, task, reminders);
 }
 
 /**
@@ -133,7 +129,7 @@ export async function replaceTaskReminders(taskId, reminders) {
 export async function addTaskReminder(taskId, reminderInstant) {
   const task = await getTask(taskId).then((res) => res.data);
   const existingReminders = extractTaskReminderInstants(task);
-  return replaceTaskReminders(taskId, [...existingReminders, reminderInstant]);
+  return replaceTaskRemindersOnTask(taskId, task, [...existingReminders, reminderInstant]);
 }
 
 /**
@@ -146,7 +142,7 @@ export async function removeTaskReminder(taskId, reminderInstant) {
   const task = await getTask(taskId).then((res) => res.data);
   const existingReminders = extractTaskReminderInstants(task);
   const nextReminders = existingReminders.filter((value) => value !== reminderInstant);
-  return replaceTaskReminders(taskId, nextReminders);
+  return replaceTaskRemindersOnTask(taskId, task, nextReminders);
 }
 
 // ─── Assignees ────────────────────────────────────────────────────────────────
@@ -412,4 +408,56 @@ function buildReminderUpdatePayloads(reminders) {
   }
 
   return payloads;
+}
+
+async function replaceTaskRemindersOnTask(taskId, task, reminders) {
+  const normalizedReminders = normalizeReminderList(reminders);
+  const baseTaskPayload = buildSafeTaskUpdatePayload(task);
+  const payloads = buildReminderUpdatePayloads(normalizedReminders)
+    .map((reminderPayload) => ({
+      ...baseTaskPayload,
+      ...reminderPayload,
+    }));
+
+  return requestFirstMutationSuccess(
+    payloads.map((payload) => () => updateTask(taskId, payload))
+  );
+}
+
+function buildSafeTaskUpdatePayload(task) {
+  if (!task || typeof task !== 'object') {
+    throw new Error('Could not load current task before updating reminders.');
+  }
+
+  const payload = {};
+  const fieldNames = [
+    'title',
+    'description',
+    'done',
+    'due_date',
+    'start_date',
+    'end_date',
+    'priority',
+    'percent_done',
+    'repeat_after',
+    'repeat_mode',
+    'hex_color',
+    'project_id',
+  ];
+
+  for (const fieldName of fieldNames) {
+    if (Object.hasOwn(task, fieldName)) {
+      payload[fieldName] = task[fieldName];
+    }
+  }
+
+  if (!payload.title && typeof task.title === 'string') {
+    payload.title = task.title;
+  }
+
+  if (!payload.title) {
+    throw new Error('Could not update reminders because the current task title is missing.');
+  }
+
+  return payload;
 }
