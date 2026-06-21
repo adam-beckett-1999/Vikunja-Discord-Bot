@@ -1,5 +1,10 @@
 import { diffTaskLabelNames, formatLabelNameList } from './task-labels.js';
 import { formatTaskDescription } from './embeds.js';
+import {
+  diffTaskReminderInstants,
+  formatReminderList,
+  hasReminderField,
+} from './task-reminders.js';
 
 const MAX_UPDATED_FIELD_VALUE_LENGTH = 120;
 const PRIORITY_LABELS = {
@@ -56,6 +61,26 @@ export function getTaskUpdateHighlightFromTasks(oldTask, task) {
         after: formatLabelNameList(labelDiff.newNames),
         added: labelDiff.added,
         removed: labelDiff.removed,
+      };
+    }
+  }
+
+  const oldHasReminder = hasReminderField(oldTask);
+  const newHasReminder = hasReminderField(task);
+
+  // Only compare reminders when both snapshots explicitly include reminder fields.
+  // This avoids false positives from partial webhook payloads.
+  if (oldHasReminder && newHasReminder) {
+    const reminderDiff = diffTaskReminderInstants(oldTask, task);
+    if (reminderDiff.added.length || reminderDiff.removed.length) {
+      const oldCount = reminderDiff.oldReminders.length;
+      const newCount = reminderDiff.newReminders.length;
+      const reminderLabel = oldCount <= 1 && newCount <= 1 ? 'Reminder' : 'Reminders';
+
+      return {
+        field: reminderLabel,
+        before: formatReminderList(reminderDiff.oldReminders),
+        after: formatReminderList(reminderDiff.newReminders),
       };
     }
   }

@@ -1,5 +1,6 @@
 import { EmbedBuilder } from 'discord.js';
 import { formatLabelNameList, formatTaskLabelsForEmbed } from './task-labels.js';
+import { formatTaskRemindersForEmbed } from './task-reminders.js';
 
 const MAX_EMBED_DESCRIPTION_LENGTH = 4096;
 
@@ -67,6 +68,11 @@ export function buildTaskEmbed(task, action, projectName, updateHighlight) {
 
   if (resolvedProjectName) {
     embed.addFields({ name: 'Project', value: String(resolvedProjectName), inline: true });
+  }
+
+  const remindersFieldValue = formatTaskRemindersForEmbed(task);
+  if (remindersFieldValue) {
+    embed.addFields({ name: 'Reminders', value: remindersFieldValue });
   }
 
   const labelsFieldValue = formatTaskLabelsForEmbed(task);
