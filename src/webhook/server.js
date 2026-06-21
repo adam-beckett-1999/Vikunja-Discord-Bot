@@ -81,7 +81,14 @@ function isSignatureValid(rawBody, signature) {
 export function startWebhookServer(discordClient) {
   const app = express();
 
-  logWebhook('info', 'Webhook server starting on port ' + config.webhook.port + ' | debugLogging=' + String(config.webhook.debugLogging));
+  logWebhook('info', 'Webhook server starting on port ' + config.webhook.port);
+
+  app.use((req, res, next) => {
+    if (req.path === '/webhook' || req.path.startsWith('/webhook/')) {
+      logWebhook('info', 'HTTP ' + req.method + ' ' + req.originalUrl + ' received from ' + (req.ip ?? 'unknown-ip'));
+    }
+    next();
+  });
 
   // Capture raw body for signature verification before JSON parsing.
   app.use('/webhook', express.raw({ type: 'application/json' }));
@@ -119,9 +126,6 @@ export function startWebhookServer(discordClient) {
 
     logWebhook('info', 'Received event: ' + (eventType ?? 'unknown') + ' | ' + requestSummary);
 
-    if (config.webhook.debugLogging) {
-      logWebhook('debug', 'Raw payload: ' + rawBody);
-    }
 
     res.status(200).json({ status: 'ok' });
 
@@ -133,6 +137,11 @@ export function startWebhookServer(discordClient) {
         logWebhook('error', 'Failed to post Discord notification: ' + (err?.stack ?? err?.message ?? String(err)));
       }
     });
+  });
+
+  app.use('/webhook', (req, res) => {
+    logWebhook('warn', 'Unhandled webhook route: ' + req.method + ' ' + req.originalUrl);
+    res.status(404).json({ error: 'Not found' });
   });
 
   const port = config.webhook.port;
@@ -253,9 +262,6 @@ async function resolveNotificationChannelId(payload, task, eventType) {
   if (projectId !== null) {
     const mappedChannelId = await getChannelIdForProject(projectId).catch(() => null);
     if (mappedChannelId) {
-      if (config.webhook.debugLogging) {
-        logWebhook('debug', 'Resolved channel ' + mappedChannelId + ' from project ' + projectId + '.');
-      }
       return mappedChannelId;
     }
 

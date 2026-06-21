@@ -57,10 +57,9 @@ Set these in `.env` in the same folder as your compose file, or ensure you inclu
 | `VIKUNJA_API_TOKEN` | Yes | Vikunja API token |
 | `WEBHOOK_PORT` | Yes | Webhook server port (default `3000`) |
 | `WEBHOOK_SECRET` | No | Secret used to verify incoming Vikunja webhooks |
-| `WEBHOOK_DEBUG_LOGGING` | No | Set to `true` to log webhook delivery details and raw payloads |
 | `NOTIFICATION_CHANNEL_ID` | No | Fallback Discord channel when a project mapping is missing |
 
-The same webhook traces are also appended to `/data/webhook.log` inside the container.
+Webhook deliveries are appended to `/data/webhook.log` inside the container, so you can inspect the request history even if `docker logs` is noisy or unavailable.
 
 
 ### Deploy the service
