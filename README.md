@@ -11,7 +11,7 @@ Self-hosted Discord bot for Vikunja.
 - Slash commands let you create, list, view, update, delete, and manage assignees and reminders on tasks.
 - `/webhook-register` creates a Vikunja webhook for a project and can map that project to a Discord channel.
 - `/webhook-channel` lets you manage project-to-channel mappings (`set`, `remove`, `list`).
-- `/alert-assignee-link` and `/alert-assignee-unlink` control who gets pinged for reminder alerts.
+- `/alert-assignee` lets you manage who gets pinged for reminder alerts (`link`, `unlink`, `list`).
 - Vikunja sends events to the bot webhook endpoint.
 - The bot posts those events to the mapped Discord channel for the matching project.
 - If `WEBHOOK_SECRET` is set, the bot verifies incoming webhook signatures.
@@ -159,7 +159,7 @@ Reminder notifications can now mention Discord users based on task assignees.
 1. Link a Vikunja assignee to a Discord user:
 
 ```text
-/alert-assignee-link assignee:<assignee> discord-user:@User
+/alert-assignee link assignee:<assignee> discord-user:@User
 ```
 
 `assignee` is global to your connected Vikunja instance.
@@ -168,13 +168,13 @@ Autocomplete suggests known assignees discovered from tasks. You can also enter 
 1. Remove a link:
 
 ```text
-/alert-assignee-unlink assignee:<assignee>
+/alert-assignee unlink assignee:<assignee>
 ```
 
 1. Show current links:
 
 ```text
-/alert-assignee-list
+/alert-assignee list
 ```
 
 When a `task.reminder.fired` webhook is received, the bot checks task assignees and mentions any linked Discord users in the notification message.
@@ -186,13 +186,22 @@ Use `/task-reminder` to work with task reminder dates directly:
 ```text
 /task-reminder add project:<project_name> task:<task_name> at:2026-06-21 18:00
 /task-reminder list project:<project_name> task:<task_name>
-/task-reminder remove project:<project_name> task:<task_name> index:1
+/task-reminder remove project:<project_name> task:<task_name> reminder:<select from autocomplete>
 ```
 
 `add` expects a date and time in `YYYY-MM-DD HH:mm` format, using a 24-hour clock in the bot's local timezone.
 The timezone is controlled by `BOT_TIMEZONE` (default `UTC`).
 For example: `2026-06-21 18:00`.
-`remove` uses the reminder number shown by the `list` subcommand.
+`remove` supports autocomplete for reminder selection.
+
+### Task completion
+
+Use dedicated commands to change task completion status:
+
+```text
+/task-done project:<project_name> task:<task_name>
+/task-pending project:<project_name> task:<task_name>
+```
 
 ---
 

@@ -63,7 +63,7 @@ export const data = new SlashCommandBuilder()
   .addSubcommand((subcommand) =>
     subcommand
       .setName('remove')
-      .setDescription('Remove a reminder from a task by its list index')
+      .setDescription('Remove a reminder from a task')
       .addStringOption((opt) =>
         opt.setName('project')
           .setDescription('Project containing the task')
@@ -76,10 +76,10 @@ export const data = new SlashCommandBuilder()
           .setRequired(true)
           .setAutocomplete(true)
       )
-      .addIntegerOption((opt) =>
-        opt.setName('index')
-          .setDescription('Reminder number from /task-reminder list')
-          .setMinValue(1)
+      .addStringOption((opt) =>
+        opt.setName('reminder')
+          .setDescription('Reminder to remove (select with autocomplete)')
+          .setAutocomplete(true)
           .setRequired(true)
       )
   );
@@ -159,19 +159,19 @@ export async function execute(interaction) {
     }
 
     if (action === 'remove') {
-      const index = interaction.options.getInteger('index', true);
+      const reminderSelection = interaction.options.getString('reminder', true);
       const beforeTask = (await getTask(task.id)).data;
       const reminders = extractTaskReminderInstants(beforeTask);
 
-      if (index > reminders.length) {
+      const reminderInstant = resolveReminderSelection(reminderSelection, reminders);
+      if (!reminderInstant) {
         await interaction.editReply({
-          embeds: [buildErrorEmbed('Reminder index `' + index + '` is out of range. Use `/task-reminder list` first.')],
+          embeds: [buildErrorEmbed('Could not match reminder `' + reminderSelection + '`. Select it from autocomplete, or use its numeric index.')],
         });
         return;
       }
 
-      const reminderInstant = reminders[index - 1];
-        markManualTaskUpdate(task.id, 8);
+      markManualTaskUpdate(task.id, 8);
       await removeTaskReminder(task.id, reminderInstant);
       const updatedTask = (await getTask(task.id)).data;
       cacheTaskSnapshot(updatedTask);
@@ -214,7 +214,85 @@ export async function autocomplete(interaction) {
 
     const choices = await autocompleteTasks(projectId, focused.value);
     await interaction.respond(choices);
+    return;
   }
+
+  if (focused.name === 'reminder') {
+    const projectSelection = interaction.options.getString('project');
+    const taskSelection = interaction.options.getString('task');
+    if (!projectSelection || !taskSelection) {
+      await interaction.respond([]);
+      return;
+    }
+
+    const projectId = parseSelectionId(projectSelection);
+    const taskId = parseSelectionId(taskSelection);
+    if (!projectId || !taskId) {
+      await interaction.respond([]);
+      return;
+    }
+
+    const selectedTask = await resolveTaskSelection(projectId, taskSelection);
+    if (!selectedTask) {
+      await interaction.respond([]);
+      return;
+    }
+
+    const taskData = await getTask(selectedTask.id)
+      .then((res) => res.data)
+      .catch(() => selectedTask);
+
+    const reminders = extractTaskReminderInstants(taskData);
+    const choices = buildReminderAutocompleteChoices(reminders, focused.value);
+    await interaction.respond(choices);
+  }
+}
+
+function resolveReminderSelection(selection, reminders) {
+  const raw = String(selection ?? '').trim();
+  if (!raw) return null;
+
+  if (reminders.includes(raw)) {
+    return raw;
+  }
+
+  if (/^\d+$/.test(raw)) {
+    const index = Number(raw);
+    if (index >= 1 && index <= reminders.length) {
+      return reminders[index - 1];
+    }
+  }
+
+  return null;
+}
+
+function buildReminderAutocompleteChoices(reminders, query) {
+  const needle = String(query ?? '').trim().toLowerCase();
+
+  const items = reminders
+    .map((instant, index) => ({
+      instant,
+      index: index + 1,
+      display: formatReminderForConfiguredTimeZone(instant),
+    }))
+    .filter((item) => {
+      if (!needle) return true;
+      return item.instant.toLowerCase().includes(needle)
+        || item.display.toLowerCase().includes(needle)
+        || String(item.index) === needle;
+    })
+    .slice(0, 25)
+    .map((item) => ({
+      name: truncateReminderChoiceName(item.index + '. ' + item.display),
+      value: item.instant,
+    }));
+
+  return items;
+}
+
+function truncateReminderChoiceName(name) {
+  if (name.length <= 100) return name;
+  return name.slice(0, 97).trimEnd() + '...';
 }
 
 function parseReminderInstant(rawValue) {

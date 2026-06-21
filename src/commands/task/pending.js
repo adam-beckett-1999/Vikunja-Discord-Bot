@@ -11,18 +11,9 @@ import { cacheTaskSnapshot, markManualTaskUpdate } from '../../services/task-upd
 import { getTaskUpdateHighlightFromTasks } from '../../utils/task-update-highlight.js';
 import { buildTaskEmbed, buildErrorEmbed } from '../../utils/embeds.js';
 
-const PRIORITY_CHOICES = [
-  { name: 'Unset', value: '0' },
-  { name: 'Low', value: '1' },
-  { name: 'Medium', value: '2' },
-  { name: 'High', value: '3' },
-  { name: 'Urgent', value: '4' },
-  { name: 'DO NOW', value: '5' },
-];
-
 export const data = new SlashCommandBuilder()
-  .setName('task-update')
-  .setDescription('Update an existing Vikunja task')
+  .setName('task-pending')
+  .setDescription('Mark a Vikunja task as pending')
   .addStringOption((opt) =>
     opt.setName('project')
       .setDescription('Project containing the task')
@@ -31,31 +22,11 @@ export const data = new SlashCommandBuilder()
   )
   .addStringOption((opt) =>
     opt.setName('task')
-      .setDescription('Task to update')
+      .setDescription('Task to mark as pending')
       .setRequired(true)
       .setAutocomplete(true)
-  )
-  .addStringOption((opt) =>
-    opt.setName('title')
-      .setDescription('New title')
-  )
-  .addStringOption((opt) =>
-    opt.setName('description')
-      .setDescription('New description')
-  )
-  .addStringOption((opt) =>
-    opt.setName('due')
-      .setDescription('New due date in YYYY-MM-DD format')
-  )
-  .addStringOption((opt) =>
-    opt.setName('priority')
-      .setDescription('Priority')
-      .addChoices(...PRIORITY_CHOICES)
   );
 
-/**
- * @param {import('discord.js').ChatInputCommandInteraction} interaction
- */
 export async function execute(interaction) {
   await interaction.deferReply();
 
@@ -77,49 +48,20 @@ export async function execute(interaction) {
     return;
   }
 
-  const title = interaction.options.getString('title') ?? undefined;
-  const description = interaction.options.getString('description') ?? undefined;
-  const dueRaw = interaction.options.getString('due') ?? undefined;
-  const priorityRaw = interaction.options.getString('priority') ?? undefined;
-  const priority = priorityRaw !== undefined ? Number(priorityRaw) : undefined;
-
-  const taskData = {};
-  if (title !== undefined) taskData.title = title;
-  if (description !== undefined) taskData.description = description;
-  if (priority !== undefined) taskData.priority = priority;
-
-  if (dueRaw !== undefined) {
-    const parsed = new Date(dueRaw);
-    if (isNaN(parsed.getTime())) {
-      await interaction.editReply({
-        embeds: [buildErrorEmbed('Invalid due date. Use YYYY-MM-DD format.')],
-      });
-      return;
-    }
-    taskData.due_date = parsed.toISOString();
-  }
-
-  if (priorityRaw !== undefined && !Number.isInteger(priority)) {
+  if (task.done === false) {
     await interaction.editReply({
-      embeds: [buildErrorEmbed('Invalid priority selected.')],
-    });
-    return;
-  }
-
-  if (Object.keys(taskData).length === 0) {
-    await interaction.editReply({
-      embeds: [buildErrorEmbed('No fields to update were provided.')],
+      embeds: [buildErrorEmbed('Task is already marked as pending.')],
     });
     return;
   }
 
   try {
-    const res = await updateTask(task.id, taskData);
+    markManualTaskUpdate(task.id);
+    const res = await updateTask(task.id, { done: false });
     const updatedTask = await getTask(task.id)
       .then((response) => response.data)
       .catch(() => res.data);
 
-    markManualTaskUpdate(task.id);
     cacheTaskSnapshot(updatedTask);
     const updateHighlight = getTaskUpdateHighlightFromTasks(task, updatedTask);
     await interaction.editReply({ embeds: [buildTaskEmbed(updatedTask, 'Updated', project.title, updateHighlight)] });
