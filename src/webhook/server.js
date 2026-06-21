@@ -13,6 +13,7 @@ import { cacheProject, getCachedProjectTitle } from '../services/project-cache.j
 import { getTaskUpdateHighlightFromTasks } from '../utils/task-update-highlight.js';
 import { getTaskUpdateHighlightFromPayload } from '../utils/task-update-highlight.js';
 import { getMappedDiscordUserIdsForTask } from '../services/assignee-links.js';
+import { getChannelIdForProject } from '../services/project-channel-links.js';
 import { extractReminderInstantFromPayload } from '../utils/task-reminders.js';
 import { EmbedBuilder } from 'discord.js';
 
@@ -128,9 +129,9 @@ export function startWebhookServer(discordClient) {
  * @param {object} payload  - Parsed Vikunja webhook payload
  */
 async function postNotification(discordClient, eventType, payload) {
-  const channelId = config.webhook.notificationChannelId;
+  const channelId = await resolveNotificationChannelId(payload);
   if (!channelId) {
-    console.warn('[Webhook] NOTIFICATION_CHANNEL_ID is not set – skipping notification.');
+    console.warn('[Webhook] No channel mapping found and NOTIFICATION_CHANNEL_ID is not set – skipping notification.');
     return;
   }
 
@@ -221,6 +222,45 @@ async function postNotification(discordClient, eventType, payload) {
   }
 
   await channel.send({ embeds: [embed] });
+}
+
+async function resolveNotificationChannelId(payload) {
+  const projectId = getProjectIdFromPayload(payload);
+
+  if (projectId !== null) {
+    const mappedChannelId = await getChannelIdForProject(projectId).catch(() => null);
+    if (mappedChannelId) {
+      return mappedChannelId;
+    }
+
+    if (config.webhook.notificationChannelId) {
+      console.warn('[Webhook] No mapped channel for project ' + projectId + '; using legacy NOTIFICATION_CHANNEL_ID fallback.');
+    }
+  }
+
+  return config.webhook.notificationChannelId ?? null;
+}
+
+function getProjectIdFromPayload(payload) {
+  const candidates = [
+    payload?.data?.task?.project_id,
+    payload?.task?.project_id,
+    payload?.data?.project_id,
+    payload?.project_id,
+    payload?.data?.project?.id,
+    payload?.project?.id,
+    payload?.data?.task?.project?.id,
+    payload?.task?.project?.id,
+  ];
+
+  for (const candidate of candidates) {
+    const numeric = Number(candidate);
+    if (Number.isFinite(numeric)) {
+      return numeric;
+    }
+  }
+
+  return null;
 }
 
 /**
