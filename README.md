@@ -74,8 +74,8 @@ services:
       - .env
     ports:
       - "3000:3000"
-      volumes:
-         - vikunja-discord-bot-data:/data
+   volumes:
+      - vikunja-discord-bot-data:/data
 
 volumes:
    vikunja-discord-bot-data:
