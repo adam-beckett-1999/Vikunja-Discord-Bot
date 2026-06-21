@@ -57,10 +57,6 @@ Set these in `.env` in the same folder as your compose file, or ensure you inclu
 | `VIKUNJA_API_TOKEN` | Yes | Vikunja API token |
 | `WEBHOOK_PORT` | Yes | Webhook server port (default `3000`) |
 | `WEBHOOK_SECRET` | No | Secret used to verify incoming Vikunja webhooks |
-| `NOTIFICATION_CHANNEL_ID` | No | Fallback Discord channel when a project mapping is missing |
-
-Webhook deliveries are appended to `/data/webhook.log` inside the container, so you can inspect the request history even if `docker logs` is noisy or unavailable.
-
 
 ### Deploy the service
 
@@ -98,6 +94,9 @@ Once the container is running, the slash commands should register within discord
 You will need the bot to be publicly accessible for the webhook handling to work correctly. The easiest method is through a reverse proxy. If you're already self-hosting Vikunja, you probably have a reverse proxy solution in place.
 
 Create a new proxy forwarding to the IP and port of the bot container, and use the HTTPS URL for the next steps.
+The target URL must resolve to the bot webhook endpoint path (`/webhook`).
+
+When using the command, the webhook will be mapped to the channel where you've run the command, so posts to the defined project will appear in that channel. If you define the channel when running the command, you can bind that webhook to any other channel the bot has permission to post in.
 
 ```text
 /webhook-register project:<project_name> url:https://your-bot.example.com/webhook events:task.created, task.updated, task.comment.created
@@ -140,11 +139,9 @@ task.created, task.updated, task.comment.created
 | `project.shared.team` | A project was shared with a team |
 | `project.shared.user` | A project was shared with a user |
 
-Vikunja will POST the selected events to the bot, which forwards them as Discord embeds to the mapped channel for that project.
-If no mapping exists for a project, the bot falls back to `NOTIFICATION_CHANNEL_ID` when set.
 If `WEBHOOK_SECRET` is set, `/webhook-register` will include that same secret when creating the webhook so incoming deliveries can pass signature verification.
 
-Manage mappings directly:
+You can use the following commands to list and update which projects/webhooks post to which channels:
 
 ```text
 /webhook-channel set project:<project_name> channel:#alerts

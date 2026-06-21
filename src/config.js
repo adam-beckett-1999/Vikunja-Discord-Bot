@@ -15,6 +15,5 @@ export default {
   webhook: {
     port: parseInt(process.env.WEBHOOK_PORT ?? '3000', 10),
     secret: process.env.WEBHOOK_SECRET,
-    notificationChannelId: process.env.NOTIFICATION_CHANNEL_ID,
   },
 };

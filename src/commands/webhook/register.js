@@ -43,10 +43,23 @@ export async function execute(interaction) {
   await interaction.deferReply({ ephemeral: true });
 
   const projectSelection = interaction.options.getString('project', true);
-  const targetUrl = interaction.options.getString('url', true);
+  const targetUrlInput = interaction.options.getString('url', true);
   const rawEvents = interaction.options.getString('events');
   const selectedChannel = interaction.options.getChannel('channel');
   const targetChannelId = selectedChannel?.id ?? interaction.channelId;
+
+  let targetUrl;
+  let urlAutoAdjusted = false;
+  try {
+    const normalized = normalizeWebhookTargetUrl(targetUrlInput);
+    targetUrl = normalized.url;
+    urlAutoAdjusted = normalized.autoAdjusted;
+  } catch (err) {
+    await interaction.editReply({
+      embeds: [buildErrorEmbed(err.message)],
+    });
+    return;
+  }
 
   const requestedHelp = rawEvents?.trim().toLowerCase() === 'help';
   if (requestedHelp) {
@@ -100,6 +113,9 @@ export async function execute(interaction) {
     const channelSummary = targetChannelId
       ? '\nDiscord channel: <#' + targetChannelId + '>'
       : '';
+    const urlAdjustSummary = urlAutoAdjusted
+      ? '\nURL note: no path was provided, so `/webhook` was appended automatically.'
+      : '';
 
     await interaction.editReply({
       embeds: [
@@ -108,6 +124,7 @@ export async function execute(interaction) {
           'Vikunja will now POST the selected events to `' + targetUrl + '`.' +
           eventsSummary +
           channelSummary +
+          urlAdjustSummary +
           '\n\nTip: set `events:help` in this command to view format and common event meanings.' +
           secretNote
         ),
@@ -130,4 +147,34 @@ export async function autocomplete(interaction) {
   }
 
   await interaction.respond([]);
+}
+
+function normalizeWebhookTargetUrl(rawValue) {
+  let parsed;
+  try {
+    parsed = new URL(String(rawValue ?? '').trim());
+  } catch {
+    throw new Error('Invalid URL. Please provide a full URL like `https://your-bot.example.com/webhook`.');
+  }
+
+  if (!['http:', 'https:'].includes(parsed.protocol)) {
+    throw new Error('Webhook URL must start with `http://` or `https://`.');
+  }
+
+  const compactPath = parsed.pathname.replace(/\/+$/, '');
+  let autoAdjusted = false;
+
+  if (!compactPath || compactPath === '/') {
+    parsed.pathname = '/webhook';
+    autoAdjusted = true;
+  } else if (compactPath !== '/webhook') {
+    throw new Error('Webhook URL path must be `/webhook` (example: `https://your-bot.example.com/webhook`).');
+  } else {
+    parsed.pathname = '/webhook';
+  }
+
+  return {
+    url: parsed.toString(),
+    autoAdjusted,
+  };
 }

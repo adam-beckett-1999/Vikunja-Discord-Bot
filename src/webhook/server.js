@@ -1,7 +1,5 @@
 import express from 'express';
 import crypto from 'node:crypto';
-import { appendFile, mkdir } from 'node:fs/promises';
-import { resolve } from 'node:path';
 import config from '../config.js';
 import { getProject, getTask } from '../services/vikunja.js';
 import { buildReminderFiredEmbed, buildTaskEmbed } from '../utils/embeds.js';
@@ -27,10 +25,6 @@ const EVENT_ACTION = {
   'task.updated': 'Updated',
   'task.deleted': 'Deleted',
 };
-
-const WEBHOOK_LOG_PATH = resolve('/data', 'webhook.log');
-
-let webhookLogQueue = Promise.resolve();
 
 /**
  * Resolve the webhook event type from the Vikunja payload.
@@ -83,13 +77,6 @@ export function startWebhookServer(discordClient) {
 
   logWebhook('info', 'Webhook server starting on port ' + config.webhook.port);
 
-  app.use((req, res, next) => {
-    if (req.path === '/webhook' || req.path.startsWith('/webhook/')) {
-      logWebhook('info', 'HTTP ' + req.method + ' ' + req.originalUrl + ' received from ' + (req.ip ?? 'unknown-ip'));
-    }
-    next();
-  });
-
   // Capture raw body for signature verification before JSON parsing.
   app.use('/webhook', express.raw({ type: 'application/json' }));
   app.use('/webhook', (req, res, next) => {
@@ -126,7 +113,6 @@ export function startWebhookServer(discordClient) {
 
     logWebhook('info', 'Received event: ' + (eventType ?? 'unknown') + ' | ' + requestSummary);
 
-
     res.status(200).json({ status: 'ok' });
 
     // Post notification asynchronously so we don't block the HTTP response.
@@ -139,14 +125,9 @@ export function startWebhookServer(discordClient) {
     });
   });
 
-  app.use('/webhook', (req, res) => {
-    logWebhook('warn', 'Unhandled webhook route: ' + req.method + ' ' + req.originalUrl);
-    res.status(404).json({ error: 'Not found' });
-  });
-
   const port = config.webhook.port;
   app.listen(port, () => {
-    logWebhook('info', 'Listening on port ' + port + ' and writing detailed traces to ' + WEBHOOK_LOG_PATH);
+    logWebhook('info', 'Listening on port ' + port);
   });
 
   return app;
@@ -163,7 +144,7 @@ async function postNotification(discordClient, eventType, payload) {
   const task = payload.data?.task ?? payload.task ?? payload.data;
   const channelId = await resolveNotificationChannelId(payload, task, eventType);
   if (!channelId) {
-    logWebhook('warn', 'No channel mapping found for payload ' + summarizeWebhookRequest(payload, eventType) + ' and NOTIFICATION_CHANNEL_ID is not set – skipping notification.');
+    logWebhook('warn', 'No project-channel mapping found for payload ' + summarizeWebhookRequest(payload, eventType) + ' – skipping notification.');
     return;
   }
 
@@ -264,10 +245,6 @@ async function resolveNotificationChannelId(payload, task, eventType) {
     if (mappedChannelId) {
       return mappedChannelId;
     }
-
-    if (config.webhook.notificationChannelId) {
-      logWebhook('warn', 'No mapped channel for project ' + projectId + '; using legacy NOTIFICATION_CHANNEL_ID fallback.');
-    }
   }
 
   const taskId = getTaskIdFromPayload(payload, task);
@@ -286,7 +263,7 @@ async function resolveNotificationChannelId(payload, task, eventType) {
     }
   }
 
-  return config.webhook.notificationChannelId ?? null;
+  return null;
 }
 
 function getProjectIdFromPayload(payload) {
@@ -354,28 +331,13 @@ function summarizeKeys(value) {
 }
 
 function logWebhook(level, message) {
-  const line = '[' + new Date().toISOString() + '] [' + String(level).toUpperCase() + '] ' + message + '\n';
-
   if (level === 'error') {
     console.error('[Webhook] ' + message);
   } else if (level === 'warn') {
     console.warn('[Webhook] ' + message);
-  } else if (level === 'debug') {
-    console.debug('[Webhook] ' + message);
   } else {
     console.log('[Webhook] ' + message);
   }
-
-  webhookLogQueue = webhookLogQueue.then(async () => {
-    try {
-      await mkdir('/data', { recursive: true });
-      await appendFile(WEBHOOK_LOG_PATH, line, 'utf8');
-    } catch (err) {
-      console.error('[Webhook] Failed to write webhook log file: ' + (err?.message ?? String(err)));
-    }
-  });
-
-  return webhookLogQueue;
 }
 
 /**
