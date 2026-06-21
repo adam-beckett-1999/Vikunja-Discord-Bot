@@ -239,8 +239,9 @@ async function resolveNotificationChannelId(payload, task, eventType) {
     }
   }
 
-  if (task?.id) {
-    const hydratedTask = await getTask(task.id)
+  const taskId = getTaskIdFromPayload(payload, task);
+  if (taskId !== null) {
+    const hydratedTask = await getTask(taskId)
       .then((res) => res.data)
       .catch(() => null);
 
@@ -248,7 +249,7 @@ async function resolveNotificationChannelId(payload, task, eventType) {
     if (hydratedProjectId !== undefined && hydratedProjectId !== null) {
       const mappedChannelId = await getChannelIdForProject(hydratedProjectId).catch(() => null);
       if (mappedChannelId) {
-        console.warn('[Webhook] Resolved channel for ' + (eventType ?? 'unknown') + ' via hydrated task ' + task.id + ' -> project ' + hydratedProjectId + '.');
+        console.warn('[Webhook] Resolved channel for ' + (eventType ?? 'unknown') + ' via hydrated task ' + taskId + ' -> project ' + hydratedProjectId + '.');
         return mappedChannelId;
       }
     }
@@ -267,6 +268,27 @@ function getProjectIdFromPayload(payload) {
     payload?.project?.id,
     payload?.data?.task?.project?.id,
     payload?.task?.project?.id,
+  ];
+
+  for (const candidate of candidates) {
+    const numeric = Number(candidate);
+    if (Number.isFinite(numeric)) {
+      return numeric;
+    }
+  }
+
+  return null;
+}
+
+function getTaskIdFromPayload(payload, task) {
+  const candidates = [
+    task?.id,
+    payload?.data?.task_id,
+    payload?.task_id,
+    payload?.data?.task?.id,
+    payload?.task?.id,
+    payload?.data?.id,
+    payload?.id,
   ];
 
   for (const candidate of candidates) {
