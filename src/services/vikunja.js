@@ -77,6 +77,14 @@ export async function getTask(taskId) {
 }
 
 /**
+ * Fetch all assignees for a task.
+ * @param {number} taskId
+ */
+export async function getTaskAssignees(taskId) {
+  return vikunjaClient.get('/tasks/' + taskId + '/assignees');
+}
+
+/**
  * Create a new task inside a project.
  *
  * @param {number} projectId

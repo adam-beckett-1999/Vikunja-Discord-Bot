@@ -129,7 +129,6 @@ export async function execute(interaction) {
           ? reminders.map((value, index) => (index + 1) + '. ' + formatReminderForConfiguredTimeZone(value)).join('\n')
           : 'none',
       });
-      embed.addFields({ name: 'Timezone', value: config.bot.timeZone, inline: true });
 
       await interaction.editReply({ embeds: [embed] });
       return;

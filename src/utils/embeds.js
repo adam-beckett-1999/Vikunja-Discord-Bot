@@ -1,4 +1,6 @@
 import { EmbedBuilder } from 'discord.js';
+import { DateTime } from 'luxon';
+import config from '../config.js';
 import { formatLabelNameList, formatTaskLabelsForEmbed } from './task-labels.js';
 import { formatTaskAssigneesForEmbed } from './task-assignees.js';
 import { formatTaskRemindersForEmbed } from './task-reminders.js';
@@ -58,8 +60,10 @@ export function buildTaskEmbed(task, action, projectName, updateHighlight) {
   embed.addFields({ name: 'Priority', value: PRIORITY_LABELS[priority] ?? 'Unknown', inline: true });
 
   if (task.due_date && task.due_date !== '0001-01-01T00:00:00Z') {
-    const due = new Date(task.due_date);
-    embed.addFields({ name: 'Due Date', value: due.toUTCString(), inline: true });
+    const due = DateTime.fromISO(String(task.due_date), { zone: 'utc' });
+    if (due.isValid) {
+      embed.addFields({ name: 'Due Date', value: due.setZone(config.bot.timeZone).toFormat("yyyy-MM-dd HH:mm '('ZZZZ')'"), inline: true });
+    }
   }
 
   const resolvedProjectName = projectName
@@ -147,9 +151,9 @@ export function buildReminderFiredEmbed(task, projectName, reminderInstant, even
   }
 
   if (reminderInstant) {
-    const reminderDate = new Date(reminderInstant);
-    if (!Number.isNaN(reminderDate.getTime())) {
-      embed.addFields({ name: 'Reminder Time', value: reminderDate.toUTCString(), inline: true });
+    const reminderDate = DateTime.fromISO(String(reminderInstant), { zone: 'utc' });
+    if (reminderDate.isValid) {
+      embed.addFields({ name: 'Reminder Time', value: reminderDate.setZone(config.bot.timeZone).toFormat("yyyy-MM-dd HH:mm '('ZZZZ')'"), inline: true });
     }
   }
 

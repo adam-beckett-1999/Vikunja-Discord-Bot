@@ -1,5 +1,6 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
+import { getTaskAssignees } from './vikunja.js';
 import { extractTaskAssignees } from '../utils/task-assignees.js';
 
 const DATA_DIR = '/data';
@@ -196,7 +197,14 @@ export async function listAssigneeLinks() {
 }
 
 export async function getMappedDiscordUserIdsForTask(task) {
-  const assignees = extractTaskAssignees(task);
+  let assignees = extractTaskAssignees(task);
+
+  if (!assignees.length && Number.isFinite(Number(task?.id))) {
+    assignees = await getTaskAssignees(task.id)
+      .then((res) => extractTaskAssignees({ assignees: res.data }))
+      .catch(() => []);
+  }
+
   if (!assignees.length) return [];
 
   const store = await readStore();

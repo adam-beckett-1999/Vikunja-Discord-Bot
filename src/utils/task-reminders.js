@@ -1,3 +1,6 @@
+import { DateTime } from 'luxon';
+import config from '../config.js';
+
 const MAX_REMINDER_LIST_LENGTH = 120;
 const MAX_REMINDER_FIELD_LENGTH = 1024;
 
@@ -169,7 +172,10 @@ function parseNumericDate(numberValue) {
 }
 
 export function formatReminderInstantForDisplay(instant) {
-  const parsed = new Date(instant);
-  if (Number.isNaN(parsed.getTime())) return String(instant);
-  return parsed.toUTCString();
+  const parsed = DateTime.fromISO(String(instant), { zone: 'utc' });
+  if (!parsed.isValid) return String(instant);
+
+  return parsed
+    .setZone(config.bot.timeZone)
+    .toFormat("yyyy-MM-dd HH:mm '('ZZZZ')'");
 }
