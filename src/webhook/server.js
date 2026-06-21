@@ -2,7 +2,12 @@ import express from 'express';
 import crypto from 'node:crypto';
 import config from '../config.js';
 import { getProject, getTask } from '../services/vikunja.js';
-import { buildReminderFiredEmbed, buildTaskEmbed, buildTaskOpenLinkComponents } from '../utils/embeds.js';
+import {
+  buildReminderFiredEmbed,
+  buildTaskEmbed,
+  buildTaskOpenLinkComponents,
+  formatTaskDescription,
+} from '../utils/embeds.js';
 import {
   cacheTaskSnapshot,
   clearTaskSnapshot,
@@ -24,6 +29,13 @@ const EVENT_ACTION = {
   'task.created': 'Created',
   'task.updated': 'Updated',
   'task.deleted': 'Deleted',
+};
+
+const WEBHOOK_EVENT_COLOURS = {
+  info: 0x3498db,
+  success: 0x2ecc71,
+  warning: 0xf39c12,
+  danger: 0xe74c3c,
 };
 
 /**
@@ -161,6 +173,21 @@ async function postNotification(discordClient, eventType, payload) {
     if (task) {
       cacheTaskSnapshot(task);
     }
+    return;
+  }
+
+  const special = await buildSpecialWebhookNotification(eventType, payload, task);
+  if (special) {
+    if (special.cacheTask?.id !== undefined) {
+      cacheTaskSnapshot(special.cacheTask);
+    }
+
+    await channel.send({
+      content: special.content,
+      embeds: [special.embed],
+      components: special.taskForOpenButton ? buildTaskOpenLinkComponents(special.taskForOpenButton) : undefined,
+      allowedMentions: special.allowedMentions,
+    });
     return;
   }
 
@@ -431,4 +458,445 @@ function buildGenericEventEmbed(eventType, payload) {
   }
 
   return embed;
+}
+
+async function buildSpecialWebhookNotification(eventType, payload, taskFromPayload) {
+  const kind = String(eventType ?? '').toLowerCase();
+
+  if (kind === 'task.comment.created' || kind === 'task.comment.edited' || kind === 'task.comment.deleted') {
+    const task = await resolveTaskForEvent(payload, taskFromPayload);
+    const comment = extractCommentEntity(payload);
+    const projectName = task ? await resolveProjectName(task) : undefined;
+
+    const action = kind.endsWith('.created')
+      ? 'Comment Added'
+      : kind.endsWith('.edited')
+        ? 'Comment Edited'
+        : 'Comment Deleted';
+
+    const embed = buildTaskEventEmbed(task, action, WEBHOOK_EVENT_COLOURS.info, projectName, payload?.time);
+    const commentText = pickString([
+      comment?.comment,
+      comment?.text,
+      comment?.content,
+      comment?.message,
+    ]);
+
+    if (commentText) {
+      const formatted = formatTaskDescription(commentText);
+      embed.setDescription(formatted.length > 600 ? formatted.slice(0, 599).trimEnd() + '…' : formatted);
+    } else {
+      embed.setDescription('A task comment event was received.');
+    }
+
+    const author = extractUserLike(comment?.author)
+      ?? extractUserLike(comment?.created_by)
+      ?? extractUserLike(payload?.user)
+      ?? extractUserLike(payload?.data?.user);
+
+    if (author) {
+      embed.addFields({ name: 'Author', value: author, inline: true });
+    }
+
+    if (comment?.id !== undefined) {
+      embed.addFields({ name: 'Comment ID', value: String(comment.id), inline: true });
+    }
+
+    return {
+      embed,
+      taskForOpenButton: task,
+      cacheTask: task,
+    };
+  }
+
+  if (kind === 'task.assignee.created' || kind === 'task.assignee.deleted') {
+    const task = await resolveTaskForEvent(payload, taskFromPayload);
+    const projectName = task ? await resolveProjectName(task) : undefined;
+    const assignee = extractAssigneeEntity(payload);
+
+    const action = kind.endsWith('.created') ? 'Assignee Added' : 'Assignee Removed';
+    const embed = buildTaskEventEmbed(task, action, WEBHOOK_EVENT_COLOURS.info, projectName, payload?.time);
+    embed.setDescription('Task assignee list was updated.');
+
+    if (assignee) {
+      embed.addFields({ name: 'Assignee', value: assignee, inline: true });
+    }
+
+    return {
+      embed,
+      taskForOpenButton: task,
+      cacheTask: task,
+    };
+  }
+
+  if (kind === 'task.attachment.created' || kind === 'task.attachment.deleted') {
+    const task = await resolveTaskForEvent(payload, taskFromPayload);
+    const projectName = task ? await resolveProjectName(task) : undefined;
+    const attachment = extractAttachmentEntity(payload);
+
+    const action = kind.endsWith('.created') ? 'Attachment Added' : 'Attachment Removed';
+    const embed = buildTaskEventEmbed(task, action, WEBHOOK_EVENT_COLOURS.info, projectName, payload?.time);
+    embed.setDescription('Task attachments were updated.');
+
+    const filename = pickString([
+      attachment?.file?.name,
+      attachment?.file_name,
+      attachment?.filename,
+      attachment?.name,
+    ]);
+    if (filename) {
+      embed.addFields({ name: 'File', value: filename, inline: true });
+    }
+
+    const attachmentId = attachment?.id ?? attachment?.attachment_id;
+    if (attachmentId !== undefined) {
+      embed.addFields({ name: 'Attachment ID', value: String(attachmentId), inline: true });
+    }
+
+    return {
+      embed,
+      taskForOpenButton: task,
+      cacheTask: task,
+    };
+  }
+
+  if (kind === 'task.relation.created' || kind === 'task.relation.deleted') {
+    const task = await resolveTaskForEvent(payload, taskFromPayload);
+    const projectName = task ? await resolveProjectName(task) : undefined;
+    const relation = extractRelationEntity(payload);
+
+    const action = kind.endsWith('.created') ? 'Relation Added' : 'Relation Removed';
+    const embed = buildTaskEventEmbed(task, action, WEBHOOK_EVENT_COLOURS.info, projectName, payload?.time);
+    embed.setDescription('Task relations were updated.');
+
+    const relationKind = pickString([
+      relation?.relation_kind,
+      relation?.kind,
+      relation?.relation,
+      relation?.type,
+    ]);
+    if (relationKind) {
+      embed.addFields({ name: 'Relation', value: relationKind, inline: true });
+    }
+
+    const relatedTaskId = relation?.other_task_id ?? relation?.otherTaskId ?? relation?.task_id;
+    if (relatedTaskId !== undefined) {
+      embed.addFields({ name: 'Related Task ID', value: String(relatedTaskId), inline: true });
+    }
+
+    return {
+      embed,
+      taskForOpenButton: task,
+      cacheTask: task,
+    };
+  }
+
+  if (kind === 'task.overdue') {
+    const task = await resolveTaskForEvent(payload, taskFromPayload);
+    const projectName = task ? await resolveProjectName(task) : undefined;
+    const embed = buildTaskEventEmbed(task, 'Task Overdue', WEBHOOK_EVENT_COLOURS.danger, projectName, payload?.time);
+    embed.setDescription('This task is now overdue.');
+
+    return {
+      embed,
+      taskForOpenButton: task,
+      cacheTask: task,
+    };
+  }
+
+  if (kind === 'tasks.overdue') {
+    const tasks = extractTaskCollection(payload);
+    if (!tasks.length) {
+      return null;
+    }
+
+    const embed = new EmbedBuilder()
+      .setColor(WEBHOOK_EVENT_COLOURS.danger)
+      .setTitle('Tasks Overdue')
+      .setDescription(tasks.slice(0, 10).map((item) => {
+        const id = item?.id !== undefined ? '#' + item.id : '#?';
+        const title = String(item?.title ?? 'Untitled task');
+        return '- ' + id + ' ' + title;
+      }).join('\n'))
+      .setTimestamp(resolveEventTimestamp(payload?.time, tasks[0]?.updated));
+
+    if (tasks.length > 10) {
+      embed.setFooter({ text: 'Showing 10 of ' + tasks.length + ' overdue tasks.' });
+    }
+
+    return {
+      embed,
+      taskForOpenButton: null,
+      cacheTask: null,
+    };
+  }
+
+  if (kind === 'project.updated' || kind === 'project.deleted' || kind === 'project.shared.team' || kind === 'project.shared.user') {
+    const project = extractProjectEntity(payload);
+    const title = project?.title ? String(project.title) : ('Project #' + (project?.id ?? '?'));
+
+    const action = kind === 'project.updated'
+      ? 'Project Updated'
+      : kind === 'project.deleted'
+        ? 'Project Deleted'
+        : kind === 'project.shared.team'
+          ? 'Project Shared (Team)'
+          : 'Project Shared (User)';
+
+    const colour = kind === 'project.deleted' ? WEBHOOK_EVENT_COLOURS.danger : WEBHOOK_EVENT_COLOURS.info;
+
+    const embed = new EmbedBuilder()
+      .setColor(colour)
+      .setTitle(action + ': ' + title)
+      .setDescription('Project webhook event received.')
+      .setTimestamp(resolveEventTimestamp(payload?.time));
+
+    if (project?.id !== undefined) {
+      embed.addFields({ name: 'Project ID', value: String(project.id), inline: true });
+    }
+
+    const sharedTarget = extractShareTarget(payload);
+    if (sharedTarget) {
+      embed.addFields({ name: 'Shared With', value: sharedTarget, inline: true });
+    }
+
+    return {
+      embed,
+      taskForOpenButton: null,
+      cacheTask: null,
+    };
+  }
+
+  return null;
+}
+
+function buildTaskEventEmbed(task, action, color, projectName, eventTime) {
+  const titleTask = task?.title ? String(task.title) : 'Task ' + (task?.id ?? '?');
+  const embed = new EmbedBuilder()
+    .setColor(color)
+    .setTitle(action + ': ' + titleTask)
+    .setFooter({ text: 'Task ID: ' + (task?.id ?? 'unknown') })
+    .setTimestamp(resolveEventTimestamp(eventTime, task?.updated));
+
+  if (projectName) {
+    embed.addFields({ name: 'Project', value: String(projectName), inline: true });
+  }
+
+  if (task?.done !== undefined) {
+    embed.addFields({ name: 'Status', value: task.done ? '✅ Done' : '🔲 Pending', inline: true });
+  }
+
+  return embed;
+}
+
+function resolveEventTimestamp(eventTime, fallback) {
+  const primary = eventTime ? new Date(eventTime) : null;
+  if (primary && !Number.isNaN(primary.getTime())) {
+    return primary;
+  }
+
+  const secondary = fallback ? new Date(fallback) : null;
+  if (secondary && !Number.isNaN(secondary.getTime())) {
+    return secondary;
+  }
+
+  return new Date();
+}
+
+async function resolveTaskForEvent(payload, taskFromPayload) {
+  if (isTaskLike(taskFromPayload)) {
+    return taskFromPayload;
+  }
+
+  const directTask = extractTaskEntity(payload);
+  if (isTaskLike(directTask)) {
+    return directTask;
+  }
+
+  const taskId = getTaskIdFromPayload(payload, taskFromPayload);
+  if (taskId === null) {
+    return null;
+  }
+
+  return getTask(taskId)
+    .then((res) => res.data)
+    .catch(() => null);
+}
+
+function isTaskLike(value) {
+  if (!value || typeof value !== 'object') return false;
+  const id = Number(value.id);
+  if (!Number.isFinite(id)) return false;
+
+  return value.project_id !== undefined
+    || value.done !== undefined
+    || value.priority !== undefined
+    || value.due_date !== undefined
+    || value.identifier !== undefined;
+}
+
+function extractTaskEntity(payload) {
+  return findFirstObject([
+    payload?.data?.task,
+    payload?.task,
+    payload?.data?.old_task,
+    payload?.data?.new_task,
+  ], isTaskLike);
+}
+
+function extractCommentEntity(payload) {
+  return findFirstObject([
+    payload?.data?.comment,
+    payload?.comment,
+    payload?.data?.task_comment,
+    payload?.task_comment,
+    payload?.data,
+  ], (value) => {
+    if (!value || typeof value !== 'object') return false;
+    return typeof value.comment === 'string'
+      || typeof value.text === 'string'
+      || typeof value.content === 'string'
+      || value.comment !== undefined;
+  });
+}
+
+function extractAttachmentEntity(payload) {
+  return findFirstObject([
+    payload?.data?.attachment,
+    payload?.attachment,
+    payload?.data?.task_attachment,
+    payload?.task_attachment,
+    payload?.data,
+  ], (value) => {
+    if (!value || typeof value !== 'object') return false;
+    return value.file !== undefined
+      || value.filename !== undefined
+      || value.file_name !== undefined
+      || value.attachment_id !== undefined;
+  });
+}
+
+function extractRelationEntity(payload) {
+  return findFirstObject([
+    payload?.data?.relation,
+    payload?.relation,
+    payload?.data?.task_relation,
+    payload?.task_relation,
+    payload?.data,
+  ], (value) => {
+    if (!value || typeof value !== 'object') return false;
+    return value.relation_kind !== undefined
+      || value.kind !== undefined
+      || value.other_task_id !== undefined
+      || value.otherTaskId !== undefined;
+  });
+}
+
+function extractProjectEntity(payload) {
+  return findFirstObject([
+    payload?.data?.project,
+    payload?.project,
+    payload?.data,
+  ], (value) => {
+    if (!value || typeof value !== 'object') return false;
+    if (isTaskLike(value)) return false;
+    return value.id !== undefined || typeof value.title === 'string';
+  });
+}
+
+function extractTaskCollection(payload) {
+  const candidates = [
+    payload?.data?.tasks,
+    payload?.tasks,
+    payload?.data?.overdue_tasks,
+    payload?.overdue_tasks,
+    payload?.data,
+  ];
+
+  for (const candidate of candidates) {
+    if (!Array.isArray(candidate)) continue;
+    const tasks = candidate.filter(isTaskLike);
+    if (tasks.length) {
+      return tasks;
+    }
+  }
+
+  return [];
+}
+
+function extractAssigneeEntity(payload) {
+  const assignee = findFirstObject([
+    payload?.data?.assignee,
+    payload?.assignee,
+    payload?.data?.user,
+    payload?.user,
+    payload?.data,
+  ], (value) => {
+    if (!value || typeof value !== 'object') return false;
+    return value.username !== undefined
+      || value.name !== undefined
+      || value.user_id !== undefined;
+  });
+
+  return extractUserLike(assignee);
+}
+
+function extractShareTarget(payload) {
+  const team = findFirstObject([
+    payload?.data?.team,
+    payload?.team,
+  ], (value) => value && typeof value === 'object');
+
+  if (team) {
+    const label = pickString([team.name, team.title]);
+    const id = team.id;
+    if (label && id !== undefined) return label + ' (#' + id + ')';
+    if (label) return label;
+    if (id !== undefined) return 'Team #' + id;
+  }
+
+  const user = findFirstObject([
+    payload?.data?.user,
+    payload?.user,
+  ], (value) => value && typeof value === 'object');
+
+  return extractUserLike(user);
+}
+
+function extractUserLike(user) {
+  if (!user || typeof user !== 'object') return null;
+
+  const username = pickString([user.username]);
+  const displayName = pickString([user.name, user.display_name, user.displayName]);
+  const id = user.id ?? user.user_id;
+
+  if (displayName && username) {
+    return displayName + ' (@' + username + ')';
+  }
+
+  if (displayName) return displayName;
+  if (username) return '@' + username;
+  if (id !== undefined) return 'User #' + id;
+  return null;
+}
+
+function findFirstObject(values, predicate) {
+  for (const value of values) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) continue;
+    if (!predicate || predicate(value)) {
+      return value;
+    }
+  }
+
+  return null;
+}
+
+function pickString(values) {
+  for (const value of values) {
+    if (typeof value === 'string' && value.trim()) {
+      return value.trim();
+    }
+  }
+
+  return null;
 }

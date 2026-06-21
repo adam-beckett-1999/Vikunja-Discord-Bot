@@ -214,8 +214,6 @@ When `WEBHOOK_SECRET` is set, the bot verifies the `X-Vikunja-Signature` HMAC-SH
 
 ## Planned improvements
 
-- Better handling for comments (show comment content in webhook post and new command e.g '/task-comment')
-
 If there's any features you would like to see, or any bugs/issues that need addressing, please create an issue.
 
 ---
