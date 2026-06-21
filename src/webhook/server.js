@@ -1,5 +1,7 @@
 import express from 'express';
 import crypto from 'node:crypto';
+import { appendFile, mkdir } from 'node:fs/promises';
+import { resolve } from 'node:path';
 import config from '../config.js';
 import { getProject, getTask } from '../services/vikunja.js';
 import { buildReminderFiredEmbed, buildTaskEmbed } from '../utils/embeds.js';
@@ -25,6 +27,10 @@ const EVENT_ACTION = {
   'task.updated': 'Updated',
   'task.deleted': 'Deleted',
 };
+
+const WEBHOOK_LOG_PATH = resolve('/data', 'webhook.log');
+
+let webhookLogQueue = Promise.resolve();
 
 /**
  * Resolve the webhook event type from the Vikunja payload.
@@ -75,18 +81,28 @@ function isSignatureValid(rawBody, signature) {
 export function startWebhookServer(discordClient) {
   const app = express();
 
+  logWebhook('info', 'Webhook server starting on port ' + config.webhook.port + ' | debugLogging=' + String(config.webhook.debugLogging));
+
   // Capture raw body for signature verification before JSON parsing.
   app.use('/webhook', express.raw({ type: 'application/json' }));
+  app.use('/webhook', (req, res, next) => {
+    const startedAt = Date.now();
+    res.on('finish', () => {
+      logWebhook('info', 'HTTP ' + req.method + ' ' + req.originalUrl + ' -> ' + res.statusCode + ' in ' + (Date.now() - startedAt) + 'ms');
+    });
+    next();
+  });
 
   app.post('/webhook', async (req, res) => {
     const rawBody = req.body.toString('utf8');
     const signature = req.headers['x-vikunja-signature'];
+    const contentLength = req.headers['content-length'] ?? 'unknown';
+    const contentType = req.headers['content-type'] ?? 'unknown';
+
+    logWebhook('info', 'Incoming webhook request | contentType=' + contentType + ' | contentLength=' + contentLength + ' | signature=' + (signature ? 'present' : 'missing'));
 
     if (!isSignatureValid(rawBody, signature)) {
-      console.warn('[Webhook] Rejected request: invalid signature', {
-        secretConfigured: Boolean(config.webhook.secret),
-        signaturePresent: Boolean(signature),
-      });
+      logWebhook('warn', 'Rejected request: invalid signature | secretConfigured=' + Boolean(config.webhook.secret) + ' | signaturePresent=' + Boolean(signature));
       return res.status(401).json({ error: 'Invalid signature' });
     }
 
@@ -94,16 +110,17 @@ export function startWebhookServer(discordClient) {
     try {
       payload = JSON.parse(rawBody);
     } catch {
+      logWebhook('warn', 'Rejected request: invalid JSON body');
       return res.status(400).json({ error: 'Invalid JSON' });
     }
 
     const eventType = getWebhookEventType(payload);
     const requestSummary = summarizeWebhookRequest(payload, eventType, signature);
 
-    console.log('[Webhook] Received event: ' + (eventType ?? 'unknown') + ' | ' + requestSummary);
+    logWebhook('info', 'Received event: ' + (eventType ?? 'unknown') + ' | ' + requestSummary);
 
     if (config.webhook.debugLogging) {
-      console.log('[Webhook][debug] Raw payload: ' + rawBody);
+      logWebhook('debug', 'Raw payload: ' + rawBody);
     }
 
     res.status(200).json({ status: 'ok' });
@@ -113,14 +130,14 @@ export function startWebhookServer(discordClient) {
       try {
         await postNotification(discordClient, eventType, payload);
       } catch (err) {
-        console.error('[Webhook] Failed to post Discord notification', err);
+        logWebhook('error', 'Failed to post Discord notification: ' + (err?.stack ?? err?.message ?? String(err)));
       }
     });
   });
 
   const port = config.webhook.port;
   app.listen(port, () => {
-    console.log('[Webhook] Listening on port ' + port);
+    logWebhook('info', 'Listening on port ' + port + ' and writing detailed traces to ' + WEBHOOK_LOG_PATH);
   });
 
   return app;
@@ -137,15 +154,15 @@ async function postNotification(discordClient, eventType, payload) {
   const task = payload.data?.task ?? payload.task ?? payload.data;
   const channelId = await resolveNotificationChannelId(payload, task, eventType);
   if (!channelId) {
-    console.warn('[Webhook] No channel mapping found for payload ' + summarizeWebhookRequest(payload, eventType) + ' and NOTIFICATION_CHANNEL_ID is not set – skipping notification.');
+    logWebhook('warn', 'No channel mapping found for payload ' + summarizeWebhookRequest(payload, eventType) + ' and NOTIFICATION_CHANNEL_ID is not set – skipping notification.');
     return;
   }
 
-  console.log('[Webhook] Routing ' + (eventType ?? 'unknown') + ' to channel ' + channelId + ' | ' + summarizeWebhookRequest(payload, eventType));
+  logWebhook('info', 'Routing ' + (eventType ?? 'unknown') + ' to channel ' + channelId + ' | ' + summarizeWebhookRequest(payload, eventType));
 
   const channel = await discordClient.channels.fetch(channelId).catch(() => null);
   if (!channel || !channel.isTextBased()) {
-    console.error('[Webhook] Notification channel not found or not text-based: ' + channelId);
+    logWebhook('error', 'Notification channel not found or not text-based: ' + channelId);
     return;
   }
 
@@ -237,13 +254,13 @@ async function resolveNotificationChannelId(payload, task, eventType) {
     const mappedChannelId = await getChannelIdForProject(projectId).catch(() => null);
     if (mappedChannelId) {
       if (config.webhook.debugLogging) {
-        console.log('[Webhook][debug] Resolved channel ' + mappedChannelId + ' from project ' + projectId + '.');
+        logWebhook('debug', 'Resolved channel ' + mappedChannelId + ' from project ' + projectId + '.');
       }
       return mappedChannelId;
     }
 
     if (config.webhook.notificationChannelId) {
-      console.warn('[Webhook] No mapped channel for project ' + projectId + '; using legacy NOTIFICATION_CHANNEL_ID fallback.');
+      logWebhook('warn', 'No mapped channel for project ' + projectId + '; using legacy NOTIFICATION_CHANNEL_ID fallback.');
     }
   }
 
@@ -257,7 +274,7 @@ async function resolveNotificationChannelId(payload, task, eventType) {
     if (hydratedProjectId !== undefined && hydratedProjectId !== null) {
       const mappedChannelId = await getChannelIdForProject(hydratedProjectId).catch(() => null);
       if (mappedChannelId) {
-        console.warn('[Webhook] Resolved channel for ' + (eventType ?? 'unknown') + ' via hydrated task ' + taskId + ' -> project ' + hydratedProjectId + '.');
+        logWebhook('warn', 'Resolved channel for ' + (eventType ?? 'unknown') + ' via hydrated task ' + taskId + ' -> project ' + hydratedProjectId + '.');
         return mappedChannelId;
       }
     }
@@ -328,6 +345,31 @@ function summarizeWebhookRequest(payload, eventType, signature) {
 function summarizeKeys(value) {
   if (!value || typeof value !== 'object') return 'none';
   return Object.keys(value).sort().join(',') || 'none';
+}
+
+function logWebhook(level, message) {
+  const line = '[' + new Date().toISOString() + '] [' + String(level).toUpperCase() + '] ' + message + '\n';
+
+  if (level === 'error') {
+    console.error('[Webhook] ' + message);
+  } else if (level === 'warn') {
+    console.warn('[Webhook] ' + message);
+  } else if (level === 'debug') {
+    console.debug('[Webhook] ' + message);
+  } else {
+    console.log('[Webhook] ' + message);
+  }
+
+  webhookLogQueue = webhookLogQueue.then(async () => {
+    try {
+      await mkdir('/data', { recursive: true });
+      await appendFile(WEBHOOK_LOG_PATH, line, 'utf8');
+    } catch (err) {
+      console.error('[Webhook] Failed to write webhook log file: ' + (err?.message ?? String(err)));
+    }
+  });
+
+  return webhookLogQueue;
 }
 
 /**

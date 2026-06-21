@@ -60,7 +60,8 @@ Set these in `.env` in the same folder as your compose file, or ensure you inclu
 | `WEBHOOK_DEBUG_LOGGING` | No | Set to `true` to log webhook delivery details and raw payloads |
 | `NOTIFICATION_CHANNEL_ID` | No | Fallback Discord channel when a project mapping is missing |
 
----
+The same webhook traces are also appended to `/data/webhook.log` inside the container.
+
 
 ### Deploy the service
 
