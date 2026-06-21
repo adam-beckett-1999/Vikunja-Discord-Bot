@@ -1,4 +1,6 @@
 const MAX_ASSIGNEE_CHOICE_NAME_LENGTH = 100;
+const MAX_ASSIGNEE_LIST_LENGTH = 120;
+const MAX_ASSIGNEE_FIELD_LENGTH = 1024;
 
 function normalize(value) {
   return String(value ?? '').trim();
@@ -6,6 +8,19 @@ function normalize(value) {
 
 function normalizeComparable(value) {
   return normalize(value).toLowerCase();
+}
+
+function escapeDiscordMarkdown(value) {
+  return String(value ?? '').replace(/[\\`*_~|]/g, '\\$&');
+}
+
+export function hasAssigneeField(task) {
+  if (!task || typeof task !== 'object') return false;
+
+  return Object.hasOwn(task, 'assignees')
+    || Object.hasOwn(task, 'assigned_users')
+    || Object.hasOwn(task, 'assignedUsers')
+    || Object.hasOwn(task, 'assignee');
 }
 
 export function extractTaskAssignees(task) {
@@ -70,6 +85,42 @@ export function toAssigneeSelectionValue(assignee) {
   }
 
   return '';
+}
+
+export function formatAssigneeNameList(names, maxLength = MAX_ASSIGNEE_LIST_LENGTH) {
+  const clean = names
+    .map((name) => escapeDiscordMarkdown(normalize(name)))
+    .filter(Boolean);
+
+  if (!clean.length) return 'none';
+
+  const text = clean.join(', ');
+  if (text.length <= maxLength) return text;
+  return text.slice(0, maxLength - 1).trimEnd() + '…';
+}
+
+export function formatTaskAssigneesForEmbed(task, maxLength = MAX_ASSIGNEE_FIELD_LENGTH) {
+  const assignees = extractTaskAssignees(task);
+  if (!assignees.length) return null;
+
+  const lines = assignees.map((assignee) => '👤 ' + escapeDiscordMarkdown(assignee.label));
+  const value = lines.join('\n');
+
+  if (value.length <= maxLength) return value;
+  return value.slice(0, maxLength - 1).trimEnd() + '…';
+}
+
+export function diffTaskAssigneeNames(oldTask, newTask) {
+  const oldNames = extractTaskAssignees(oldTask).map((assignee) => assignee.label);
+  const newNames = extractTaskAssignees(newTask).map((assignee) => assignee.label);
+
+  const oldSet = new Set(oldNames.map((name) => name.toLowerCase()));
+  const newSet = new Set(newNames.map((name) => name.toLowerCase()));
+
+  const added = newNames.filter((name) => !oldSet.has(name.toLowerCase()));
+  const removed = oldNames.filter((name) => !newSet.has(name.toLowerCase()));
+
+  return { oldNames, newNames, added, removed };
 }
 
 export function formatAssigneeChoiceName(assignee) {

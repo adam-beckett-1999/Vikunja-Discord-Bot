@@ -1,5 +1,6 @@
 import { EmbedBuilder } from 'discord.js';
 import { formatLabelNameList, formatTaskLabelsForEmbed } from './task-labels.js';
+import { formatTaskAssigneesForEmbed } from './task-assignees.js';
 import { formatTaskRemindersForEmbed } from './task-reminders.js';
 
 const MAX_EMBED_DESCRIPTION_LENGTH = 4096;
@@ -70,6 +71,11 @@ export function buildTaskEmbed(task, action, projectName, updateHighlight) {
     embed.addFields({ name: 'Project', value: String(resolvedProjectName), inline: true });
   }
 
+  const assigneesFieldValue = formatTaskAssigneesForEmbed(task);
+  if (assigneesFieldValue) {
+    embed.addFields({ name: 'Assignees', value: assigneesFieldValue });
+  }
+
   const remindersFieldValue = formatTaskRemindersForEmbed(task);
   if (remindersFieldValue) {
     embed.addFields({ name: 'Reminders', value: remindersFieldValue });
@@ -87,7 +93,8 @@ export function buildTaskEmbed(task, action, projectName, updateHighlight) {
   }
 
   if (updateHighlight?.field) {
-    const hasLabelDiff = Array.isArray(updateHighlight.added) || Array.isArray(updateHighlight.removed);
+    const hasLabelDiff = updateHighlight.field === 'Labels'
+      && (Array.isArray(updateHighlight.added) || Array.isArray(updateHighlight.removed));
 
     if (hasLabelDiff) {
       const added = Array.isArray(updateHighlight.added) ? updateHighlight.added : [];
@@ -102,10 +109,10 @@ export function buildTaskEmbed(task, action, projectName, updateHighlight) {
         value: lines.join('\n'),
       });
     } else {
-    embed.addFields({
-      name: 'Updated',
-      value: '**' + updateHighlight.field + '**\n' + updateHighlight.before + ' → ' + updateHighlight.after,
-    });
+      embed.addFields({
+        name: 'Updated',
+        value: '**' + updateHighlight.field + '**\n' + updateHighlight.before + ' → ' + updateHighlight.after,
+      });
     }
   }
 
@@ -158,6 +165,11 @@ export function buildReminderFiredEmbed(task, projectName, reminderInstant, even
 
   if (resolvedProjectName) {
     embed.addFields({ name: 'Project', value: String(resolvedProjectName), inline: true });
+  }
+
+  const assigneesFieldValue = formatTaskAssigneesForEmbed(task);
+  if (assigneesFieldValue) {
+    embed.addFields({ name: 'Assignees', value: assigneesFieldValue });
   }
 
   embed.addFields({

@@ -1,4 +1,9 @@
 import { diffTaskLabelNames, formatLabelNameList } from './task-labels.js';
+import {
+  diffTaskAssigneeNames,
+  formatAssigneeNameList,
+  hasAssigneeField,
+} from './task-assignees.js';
 import { formatTaskDescription } from './embeds.js';
 import {
   diffTaskReminderInstants,
@@ -61,6 +66,26 @@ export function getTaskUpdateHighlightFromTasks(oldTask, task) {
         after: formatLabelNameList(labelDiff.newNames),
         added: labelDiff.added,
         removed: labelDiff.removed,
+      };
+    }
+  }
+
+  const oldHasAssignee = hasAssigneeField(oldTask);
+  const newHasAssignee = hasAssigneeField(task);
+
+  // Only compare assignees when both snapshots explicitly include assignee fields.
+  // This avoids false positives from partial webhook payloads.
+  if (oldHasAssignee && newHasAssignee) {
+    const assigneeDiff = diffTaskAssigneeNames(oldTask, task);
+    if (assigneeDiff.added.length || assigneeDiff.removed.length) {
+      const oldCount = assigneeDiff.oldNames.length;
+      const newCount = assigneeDiff.newNames.length;
+      const assigneeLabel = oldCount <= 1 && newCount <= 1 ? 'Assignee' : 'Assignees';
+
+      return {
+        field: assigneeLabel,
+        before: formatAssigneeNameList(assigneeDiff.oldNames),
+        after: formatAssigneeNameList(assigneeDiff.newNames),
       };
     }
   }
