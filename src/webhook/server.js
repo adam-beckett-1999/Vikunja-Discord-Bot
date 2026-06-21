@@ -129,19 +129,20 @@ export function startWebhookServer(discordClient) {
  * @param {object} payload  - Parsed Vikunja webhook payload
  */
 async function postNotification(discordClient, eventType, payload) {
-  const channelId = await resolveNotificationChannelId(payload);
+  const task = payload.data?.task ?? payload.task ?? payload.data;
+  const channelId = await resolveNotificationChannelId(payload, task, eventType);
   if (!channelId) {
     console.warn('[Webhook] No channel mapping found and NOTIFICATION_CHANNEL_ID is not set – skipping notification.');
     return;
   }
+
+  console.log('[Webhook] Routing ' + (eventType ?? 'unknown') + ' to channel ' + channelId);
 
   const channel = await discordClient.channels.fetch(channelId).catch(() => null);
   if (!channel || !channel.isTextBased()) {
     console.error('[Webhook] Notification channel not found or not text-based: ' + channelId);
     return;
   }
-
-  const task = payload.data?.task ?? payload.task ?? payload.data;
 
   if (eventType === 'task.updated' && task?.id && shouldSuppressWebhookUpdate(task.id)) {
     cacheTaskSnapshot(task);
@@ -224,7 +225,7 @@ async function postNotification(discordClient, eventType, payload) {
   await channel.send({ embeds: [embed] });
 }
 
-async function resolveNotificationChannelId(payload) {
+async function resolveNotificationChannelId(payload, task, eventType) {
   const projectId = getProjectIdFromPayload(payload);
 
   if (projectId !== null) {
@@ -235,6 +236,21 @@ async function resolveNotificationChannelId(payload) {
 
     if (config.webhook.notificationChannelId) {
       console.warn('[Webhook] No mapped channel for project ' + projectId + '; using legacy NOTIFICATION_CHANNEL_ID fallback.');
+    }
+  }
+
+  if (task?.id) {
+    const hydratedTask = await getTask(task.id)
+      .then((res) => res.data)
+      .catch(() => null);
+
+    const hydratedProjectId = hydratedTask?.project_id ?? hydratedTask?.project?.id;
+    if (hydratedProjectId !== undefined && hydratedProjectId !== null) {
+      const mappedChannelId = await getChannelIdForProject(hydratedProjectId).catch(() => null);
+      if (mappedChannelId) {
+        console.warn('[Webhook] Resolved channel for ' + (eventType ?? 'unknown') + ' via hydrated task ' + task.id + ' -> project ' + hydratedProjectId + '.');
+        return mappedChannelId;
+      }
     }
   }
 
