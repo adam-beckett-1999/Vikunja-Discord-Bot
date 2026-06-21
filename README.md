@@ -8,7 +8,7 @@ Self-hosted Discord bot for Vikunja.
 
 ## How it works
 
-- Slash commands let you create, list, view, update, and delete tasks.
+- Slash commands let you create, list, view, update, delete, and manage assignees on tasks.
 - `/webhook-register` creates a Vikunja webhook for a project.
 - `/alert-assignee-link` and `/alert-assignee-unlink` control who gets pinged for reminder alerts.
 - Vikunja sends events to the bot webhook endpoint.

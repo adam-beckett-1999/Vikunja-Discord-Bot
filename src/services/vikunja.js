@@ -107,6 +107,42 @@ export async function deleteTask(taskId) {
   return vikunjaClient.delete('/tasks/' + taskId);
 }
 
+// ─── Assignees ────────────────────────────────────────────────────────────────
+
+/**
+ * Link a user as assignee to a task.
+ * Uses endpoint and payload fallbacks to support Vikunja version differences.
+ *
+ * @param {number} taskId
+ * @param {number|string} userId
+ */
+export async function addAssigneeToTask(taskId, userId) {
+  const id = Number(userId);
+
+  return requestFirstMutationSuccess([
+    () => vikunjaClient.put('/tasks/' + taskId + '/assignees', { id }),
+    () => vikunjaClient.put('/tasks/' + taskId + '/assignees', { user_id: id }),
+    () => vikunjaClient.post('/tasks/' + taskId + '/assignees', { id }),
+    () => vikunjaClient.post('/tasks/' + taskId + '/assignees', { user_id: id }),
+    () => vikunjaClient.put('/tasks/' + taskId + '/assignees/' + id),
+    () => vikunjaClient.post('/tasks/' + taskId + '/assignees/' + id),
+  ]);
+}
+
+/**
+ * Unlink a user assignee from a task.
+ *
+ * @param {number} taskId
+ * @param {number|string} userId
+ */
+export async function removeAssigneeFromTask(taskId, userId) {
+  const id = Number(userId);
+
+  return requestFirstMutationSuccess([
+    () => vikunjaClient.delete('/tasks/' + taskId + '/assignees/' + id),
+  ]);
+}
+
 // ─── Labels ───────────────────────────────────────────────────────────────────
 
 function isEndpointNotFound(err) {
