@@ -1,8 +1,8 @@
 import { ChannelType, SlashCommandBuilder } from 'discord.js';
-import { createWebhook } from '../../services/vikunja.js';
+import { createWebhook, deleteWebhook } from '../../services/vikunja.js';
 import config from '../../config.js';
 import { autocompleteProjects, resolveProjectSelection } from '../../services/vikunja-lookups.js';
-import { setProjectChannelLink } from '../../services/project-channel-links.js';
+import { setProjectChannelLink, removeProjectChannelLink } from '../../services/project-channel-links.js';
 import { generateWebhookSecret, upsertWebhookRecord } from '../../services/webhook-records.js';
 import {
   formatWebhookEventsHelp,
@@ -88,14 +88,28 @@ export async function execute(interaction) {
     const secret = generateWebhookSecret();
     const targetUrl = buildWebhookTargetUrl();
     const res = await createWebhook(project.id, targetUrl, events, secret);
-    await setProjectChannelLink(project.id, targetChannelId);
-    await upsertWebhookRecord({
-      projectId: project.id,
-      webhookId: res.data.id,
-      targetUrl,
-      secret,
-      events,
-    });
+    const webhookId = res.data.id;
+
+    try {
+      await setProjectChannelLink(project.id, targetChannelId);
+      await upsertWebhookRecord({
+        projectId: project.id,
+        webhookId,
+        targetUrl,
+        secret,
+        events,
+      });
+    } catch (storageErr) {
+      // Roll back the Vikunja webhook and any partial channel mapping so no
+      // orphaned webhook is left delivering events the bot cannot verify.
+      await deleteWebhook(project.id, webhookId).catch(() => {});
+      await removeProjectChannelLink(project.id).catch(() => {});
+      throw new Error(
+        'Webhook was registered in Vikunja but local records could not be saved '
+        + '(it has been deleted automatically). Please try again. '
+        + 'Detail: ' + (storageErr?.message ?? String(storageErr))
+      );
+    }
 
     const eventsSummary = '\nEvents: `' + events.join('`, `') + '`';
     const channelSummary = targetChannelId
@@ -105,7 +119,7 @@ export async function execute(interaction) {
     await interaction.editReply({
       embeds: [
         buildSuccessEmbed(
-          'Webhook `' + res.data.id + '` registered on project `' + project.title + '`.\n' +
+          'Webhook `' + webhookId + '` registered on project `' + project.title + '`.\n' +
           'Vikunja will now POST the selected events to `' + targetUrl + '`.' +
           eventsSummary +
           channelSummary +

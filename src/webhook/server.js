@@ -299,7 +299,7 @@ async function postNotification(discordClient, eventType, payload) {
       content: special.content,
       embeds: [special.embed],
       components: special.taskForOpenButton ? buildTaskOpenLinkComponents(special.taskForOpenButton) : undefined,
-      allowedMentions: special.allowedMentions,
+      allowedMentions: special.allowedMentions ?? { parse: [] },
     });
     return;
   }
@@ -336,6 +336,7 @@ async function postNotification(discordClient, eventType, payload) {
     await channel.send({
       embeds: [embed],
       components: openButtonSource !== null ? buildProjectOpenLinkComponents(openButtonSource) : undefined,
+      allowedMentions: { parse: [] },
     });
     return;
   } else if (task) {
@@ -366,8 +367,8 @@ async function postNotification(discordClient, eventType, payload) {
         embeds: [embed],
         components: buildTaskOpenLinkComponents(reminderTask),
         allowedMentions: mentionedUserIds.length
-          ? { users: mentionedUserIds }
-          : undefined,
+          ? { users: mentionedUserIds, parse: [] }
+          : { parse: [] },
       });
 
       cacheTaskSnapshot(reminderTask);
@@ -402,6 +403,7 @@ async function postNotification(discordClient, eventType, payload) {
   await channel.send({
     embeds: [embed],
     components: taskForEmbed ? buildTaskOpenLinkComponents(taskForEmbed) : undefined,
+    allowedMentions: { parse: [] },
   });
 }
 
