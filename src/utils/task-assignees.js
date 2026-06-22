@@ -33,13 +33,10 @@ export function extractTaskAssignees(task) {
     task.assignee ? [task.assignee] : null,
   ];
 
-  let rawAssignees = [];
-  for (const candidate of candidates) {
-    if (Array.isArray(candidate)) {
-      rawAssignees = candidate;
-      break;
-    }
-  }
+  const rawAssignees = candidates
+    .filter((candidate) => Array.isArray(candidate))
+    .flat()
+    .filter(Boolean);
 
   const deduped = new Map();
 

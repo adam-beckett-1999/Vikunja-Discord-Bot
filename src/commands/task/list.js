@@ -61,11 +61,19 @@ export async function execute(interaction) {
         (page) => getAllTasks({ page, per_page: VIKUNJA_MAX_PER_PAGE, ...(search ? { s: search } : {}) }),
       ).catch(async (err) => {
         if (!search) {
+          if (!shouldFallbackToAllProjectsAggregation(err)) {
+            throw err;
+          }
+
           logTaskListAllProjectsFallback(err);
           return { data: await getAllTasksAcrossProjects() };
         }
 
         if (!shouldRetryWithoutServerSearch(err, search)) {
+          if (!shouldFallbackToAllProjectsAggregation(err)) {
+            throw err;
+          }
+
           logTaskListSearchAllProjectsFallback(search, err);
           return { data: await getAllTasksAcrossProjects() };
         }
@@ -126,6 +134,11 @@ async function fetchAllPages(fetchPage) {
   }
 
   return { data: collected };
+}
+
+function shouldFallbackToAllProjectsAggregation(err) {
+  const status = Number(err?.response?.status);
+  return Number.isFinite(status) && [400, 401, 403, 404].includes(status);
 }
 
 function shouldRetryWithoutServerSearch(err, search) {

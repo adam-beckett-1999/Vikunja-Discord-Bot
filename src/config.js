@@ -32,10 +32,27 @@ function requireIanaTimezone(name) {
   return value;
 }
 
+function requireHttpUrlEnv(name) {
+  const value = requireEnv(name);
+
+  let parsed;
+  try {
+    parsed = new URL(value);
+  } catch {
+    throw new Error(name + ' must be a valid URL, e.g. https://your-bot.example.com');
+  }
+
+  if (!['http:', 'https:'].includes(parsed.protocol)) {
+    throw new Error(name + ' must start with http:// or https://');
+  }
+
+  return value;
+}
+
 export default {
   bot: {
     timeZone: requireIanaTimezone('TZ'),
-    publicUrl: requireEnv('BOT_PUBLIC_URL'),
+    publicUrl: requireHttpUrlEnv('BOT_PUBLIC_URL'),
   },
   discord: {
     token: requireEnv('DISCORD_TOKEN'),
