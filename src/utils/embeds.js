@@ -385,8 +385,8 @@ export function buildProjectListEmbed(projects) {
  * @param {string}   title  - Embed title
  * @returns {EmbedBuilder}
  */
-export function buildTaskListEmbed(tasks, title) {
-  return buildTaskListEmbedWithOptions(tasks, title, {});
+export function buildTaskListEmbed(tasks, title, options = {}) {
+  return buildTaskListEmbedWithOptions(tasks, title, options);
 }
 
 /**
