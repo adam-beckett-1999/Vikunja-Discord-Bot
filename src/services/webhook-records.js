@@ -124,6 +124,10 @@ export async function upsertWebhookRecord(recordInput) {
       updatedAt,
     };
 
+    // Keep only the latest webhook secret per project to avoid stale secrets
+    // remaining valid after a webhook is rotated or re-registered.
+    store.records = store.records.filter((record) => record.projectId !== projectId);
+
     const existingIndex = store.records.findIndex((record) => record.webhookId === webhookId);
     if (existingIndex >= 0) {
       store.records[existingIndex] = nextRecord;
