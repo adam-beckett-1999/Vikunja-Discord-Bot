@@ -74,3 +74,11 @@ Current approved baseline in this repo includes:
 - `luxon@^3.7.2`
 
 **Do not flag these versions as outdated without validating against npm registry data first.**
+
+### Task assignee command autocomplete
+
+The `/task-assignee` command intentionally keeps CSV-style `add` / `remove` options while still
+enabling Discord autocomplete as a best-effort assist for discovery.
+
+This is a deliberate UX tradeoff in this repo.
+**Do not flag this as a correctness issue or suggest removing autocomplete by default.**

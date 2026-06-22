@@ -122,25 +122,20 @@ function normalizeUrlForCompare(urlValue) {
 }
 
 function resolveSecretsForPayload(payload, webhookRecords) {
+  const projectId = getProjectIdFromPayload(payload);
+  if (projectId !== null) {
+    return webhookRecords
+      .filter((record) => Number(record.projectId) === Number(projectId))
+      .map((record) => record.secret)
+      .filter(Boolean);
+  }
+
   const configuredWebhookUrl = normalizeUrlForCompare(getConfiguredWebhookUrl());
   const matchingByUrl = configuredWebhookUrl
     ? webhookRecords.filter((record) => normalizeUrlForCompare(record.targetUrl) === configuredWebhookUrl)
     : webhookRecords;
 
   const candidateRecords = matchingByUrl.length ? matchingByUrl : webhookRecords;
-  const projectId = getProjectIdFromPayload(payload);
-
-  if (projectId !== null) {
-    const projectSecrets = candidateRecords
-      .filter((record) => Number(record.projectId) === Number(projectId))
-      .map((record) => record.secret)
-      .filter(Boolean);
-
-    if (projectSecrets.length) {
-      return projectSecrets;
-    }
-  }
-
   return candidateRecords.map((record) => record.secret).filter(Boolean);
 }
 
