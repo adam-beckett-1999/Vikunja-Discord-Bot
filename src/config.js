@@ -1,15 +1,21 @@
 import 'dotenv/config';
 
+function requireEnv(name) {
+  const value = process.env[name]?.trim();
+  if (!value) {
+    throw new Error('Missing required environment variable: ' + name);
+  }
+
+  return value;
+}
+
 export default {
   bot: {
-    timeZone: (process.env.BOT_TIMEZONE ?? 'UTC').trim() || 'UTC',
+    timeZone: requireEnv('TZ'),
   },
   discord: {
     token: process.env.DISCORD_TOKEN,
     clientId: process.env.DISCORD_CLIENT_ID,
-    guildIds: process.env.DISCORD_GUILD_IDS
-      ? process.env.DISCORD_GUILD_IDS.split(',').map((id) => id.trim()).filter(Boolean)
-      : [],
   },
   vikunja: {
     baseUrl: process.env.VIKUNJA_BASE_URL?.replace(/\/$/, ''),

@@ -14,7 +14,7 @@ Self-hosted Discord bot for Vikunja.
 - `/alert-assignee` lets you manage who gets pinged for reminder alerts (`link`, `unlink`, `list`).
 - Vikunja sends events to the bot webhook endpoint.
 - The bot posts those events to the mapped Discord channel for the matching project.
-- Task embeds include an `Open` link button that jumps straight to the task in your Vikunja web UI.
+- Task embeds include an `Open` link button for the relevant Vikunja page.
 - If `WEBHOOK_SECRET` is set, the bot verifies incoming webhook signatures.
 
 ## What you need
@@ -51,14 +51,13 @@ Set these in `.env` in the same folder as your compose file, or ensure you inclu
 
 | Variable | Required | Purpose |
 |---|---|---|
-| `DISCORD_TOKEN` | Yes | Discord bot token |
-| `DISCORD_CLIENT_ID` | Yes | Discord application client ID |
-| `BOT_TIMEZONE` | No | IANA timezone for reminder input parsing (default `UTC`) |
-| `DISCORD_GUILD_IDS` | Yes | Discord guild IDs for instant slash command registration |
+| `TZ` | Yes | Bot timezone |
+| `DISCORD_TOKEN` | Yes | Bot token |
+| `DISCORD_CLIENT_ID` | Yes | Application client ID |
 | `VIKUNJA_BASE_URL` | Yes | Vikunja base URL |
 | `VIKUNJA_API_TOKEN` | Yes | Vikunja API token |
-| `WEBHOOK_PORT` | Yes | Webhook server port (default `3000`) |
-| `WEBHOOK_SECRET` | No | Secret used to verify incoming Vikunja webhooks |
+| `WEBHOOK_PORT` | No | Webhook port (default `3000`) |
+| `WEBHOOK_SECRET` | No | Webhook signature secret |
 
 ### Deploy the service
 
@@ -88,6 +87,8 @@ docker run --rm -p 3000:3000 -v vikunja-discord-bot-data:/data --env-file /YOUR/
 ```
 
 Once the container is running, the slash commands should register within discord. You may need to check the permissions on your bot within the server.
+
+The bot should already be invited to the server before the container starts so the deploy step can discover it automatically. If you add the bot to a server after the container is already running, restart the container so command deployment can re-authenticate and pick up the new guild.
 
 ---
 
@@ -190,8 +191,8 @@ Use `/task-reminder` to work with task reminder dates directly:
 /task-reminder remove project:<project_name> task:<task_name> reminder:<select from autocomplete>
 ```
 
-`add` expects a date and time in `YYYY-MM-DD HH:mm` format, using a 24-hour clock in the bot's local timezone.
-The timezone is controlled by `BOT_TIMEZONE` (default `UTC`).
+`add` expects a date and time in `YYYY-MM-DD HH:mm` format, using a 24-hour clock in the bot's configured timezone.
+Set `TZ` to change that timezone (default `UTC`).
 For example: `2026-06-21 18:00`.
 `remove` supports autocomplete for reminder selection.
 

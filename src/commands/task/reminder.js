@@ -24,7 +24,7 @@ export const data = new SlashCommandBuilder()
   .addSubcommand((subcommand) =>
     subcommand
       .setName('add')
-      .setDescription('Add a reminder using YYYY-MM-DD HH:mm (24h) in BOT_TIMEZONE')
+      .setDescription('Add a reminder using YYYY-MM-DD HH:mm (24h) in TZ')
       .addStringOption((opt) =>
         opt.setName('project')
           .setDescription('Project containing the task')
