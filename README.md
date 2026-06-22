@@ -1,10 +1,10 @@
-# Vikunja Discord Bot
+![Vikunja Discord Bot Banner](/demo/vikunja-discord-bot-banner-with-background.png)
 
-Self-hosted Discord bot for Vikunja.
+---
 
-![Vikunja Bot Demo 1](demo/Vikunja%20Bot%20Demo%201.gif)
+![Vikunja Discord Bot GIF Example 1](demo/Vikunja%20Bot%20Demo%201.gif)
 
-![Vikunja Bot Demo 2](demo/Vikunja%20Bot%20Demo%202.gif)
+![Vikunja Discord Bot GIF Example 2](demo/Vikunja%20Bot%20Demo%202.gif)
 
 ## How it works
 
