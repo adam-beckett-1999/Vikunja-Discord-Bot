@@ -2,8 +2,8 @@ name: Build and Push Docker Image (Dev Branch)
 
 on:
   push:
-    branches:
-      - 1.0-base-dev
+    branches-ignore:
+      - release
   workflow_dispatch:
 
 permissions:
