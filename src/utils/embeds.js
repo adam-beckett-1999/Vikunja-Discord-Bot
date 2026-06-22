@@ -164,8 +164,10 @@ export function buildReminderFiredEmbed(task, projectName, reminderInstant, even
   }
 
   if (task.due_date && task.due_date !== '0001-01-01T00:00:00Z') {
-    const due = new Date(task.due_date);
-    embed.addFields({ name: 'Due Date', value: due.toUTCString(), inline: true });
+    const due = DateTime.fromISO(String(task.due_date), { zone: 'utc' });
+    if (due.isValid) {
+      embed.addFields({ name: 'Due Date', value: due.setZone(config.bot.timeZone).toFormat("yyyy-MM-dd HH:mm '('ZZZZ')'"), inline: true });
+    }
   }
 
   const resolvedProjectName = projectName
