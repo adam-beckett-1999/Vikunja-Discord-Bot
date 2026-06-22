@@ -183,7 +183,10 @@ export function startWebhookServer(discordClient) {
       return res.status(400).json({ error: 'Invalid JSON' });
     }
 
-    const webhookRecords = await listWebhookRecords().catch(() => []);
+    const webhookRecords = await listWebhookRecords().catch((err) => {
+      logWebhook('error', 'Failed to read webhook records: ' + (err?.stack ?? err?.message ?? String(err)));
+      return [];
+    });
     if (!webhookRecords.length) {
       logWebhook('warn', 'Rejected request: no webhook records available for signature verification');
       return res.status(401).json({ error: 'Invalid signature' });
@@ -496,14 +499,19 @@ function summarizeWebhookRequest(payload, eventType, signature) {
   const payloadKeys = summarizeKeys(payload);
   const dataKeys = summarizeKeys(payload?.data);
 
-  return [
+  const parts = [
     'event=' + (eventType ?? 'unknown'),
     'projectId=' + (projectId ?? 'n/a'),
     'taskId=' + (taskId ?? 'n/a'),
     'payloadKeys=' + payloadKeys,
     'dataKeys=' + dataKeys,
-    'signature=' + (signature ? 'present' : 'missing'),
-  ].join(' | ');
+  ];
+
+  if (signature !== undefined) {
+    parts.push('signature=' + (signature ? 'present' : 'missing'));
+  }
+
+  return parts.join(' | ');
 }
 
 function summarizeKeys(value) {

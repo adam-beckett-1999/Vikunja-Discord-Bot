@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 import { getTaskAssignees } from './vikunja.js';
 import { extractTaskAssignees } from '../utils/task-assignees.js';
 
-const DATA_DIR = '/data';
+const DATA_DIR = process.env.DATA_DIR?.trim() || '/data';
 const STORE_PATH = resolve(DATA_DIR, 'assignee-links.json');
 
 const EMPTY_STORE = {

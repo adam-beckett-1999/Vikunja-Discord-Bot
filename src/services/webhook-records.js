@@ -2,7 +2,7 @@ import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { randomBytes } from 'node:crypto';
 import { resolve } from 'node:path';
 
-const DATA_DIR = '/data';
+const DATA_DIR = process.env.DATA_DIR?.trim() || '/data';
 const STORE_PATH = resolve(DATA_DIR, 'webhook-records.json');
 
 const EMPTY_STORE = {
