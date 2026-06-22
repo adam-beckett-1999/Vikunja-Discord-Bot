@@ -230,19 +230,38 @@ function decodeHtmlEntities(input) {
 
 function formatChecklistLine(line) {
   const checklistMatch = line.match(/^\s*(?:(?:[-*+]|\d+\.)\s+)?\[(x|X| )\]\s*(.*)$/);
-  if (!checklistMatch) {
-    return line;
+  if (checklistMatch) {
+    const isChecked = checklistMatch[1].toLowerCase() === 'x';
+    const text = checklistMatch[2].trim();
+    const icon = isChecked ? '✅' : '🔲';
+
+    return text ? icon + ' ' + text : icon;
   }
 
-  const isChecked = checklistMatch[1].toLowerCase() === 'x';
-  const text = checklistMatch[2].trim();
-  const icon = isChecked ? '✅' : '🔲';
+  const unicodeCheckboxMatch = line.match(/^\s*([☐☑✅🔲])\s*(.*)$/);
+  if (unicodeCheckboxMatch) {
+    const isChecked = ['☑', '✅'].includes(unicodeCheckboxMatch[1]);
+    const text = unicodeCheckboxMatch[2].trim();
+    const icon = isChecked ? '✅' : '🔲';
 
-  return text ? icon + ' ' + text : icon;
+    return text ? icon + ' ' + text : icon;
+  }
+
+  return line;
 }
 
 function isRenderedChecklistLine(line) {
-  return /^✅(?:\s|$)|^🔲(?:\s|$)/.test(String(line ?? '').trim());
+  return /^(?:✅|🔲)(?:\s|$)|^(?:[-*+]|\d+\.)\s+\[(?:x|X| )\]/.test(String(line ?? '').trim());
+}
+
+function findNextNonBlankIndex(lines, startIndex) {
+  for (let index = startIndex; index < lines.length; index += 1) {
+    if (String(lines[index] ?? '').trim() !== '') {
+      return index;
+    }
+  }
+
+  return -1;
 }
 
 function collapseChecklistSpacing(lines) {
@@ -250,11 +269,19 @@ function collapseChecklistSpacing(lines) {
 
   for (let index = 0; index < lines.length; index += 1) {
     const current = lines[index];
-    const previous = index > 0 ? lines[index - 1] : '';
-    const next = index + 1 < lines.length ? lines[index + 1] : '';
 
     const isBlank = String(current ?? '').trim() === '';
-    if (isBlank && isRenderedChecklistLine(previous) && isRenderedChecklistLine(next)) {
+    if (isBlank) {
+      const previous = index > 0 ? lines[index - 1] : '';
+      const nextNonBlankIndex = findNextNonBlankIndex(lines, index + 1);
+      const nextNonBlank = nextNonBlankIndex >= 0 ? lines[nextNonBlankIndex] : '';
+
+      if (isRenderedChecklistLine(previous) && isRenderedChecklistLine(nextNonBlank)) {
+        continue;
+      }
+    }
+
+    if (isBlank && collapsed.length === 0) {
       continue;
     }
 
