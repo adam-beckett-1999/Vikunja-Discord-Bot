@@ -1,10 +1,12 @@
-![Vikunja Discord Bot Banner](/demo/vikunja-discord-bot-banner-with-background.png)
+![Vikunja Discord Bot Banner](media/vikunja-discord-bot-banner-with-background.png)
+
+![Docker Pulls](https://img.shields.io/docker/pulls/adambeckett1999/vikunja-discord-bot) - ![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/adam-beckett-1999/Vikunja-Discord-Bot/docker-build-push-dev.yml?label=dev-build) ![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/adam-beckett-1999/Vikunja-Discord-Bot/docker-build-push-release.yml?label=release-build) - ![GitHub last commit](https://img.shields.io/github/last-commit/adam-beckett-1999/Vikunja-Discord-Bot) ![GitHub Issues or Pull Requests](https://img.shields.io/github/issues/adam-beckett-1999/Vikunja-Discord-Bot) - ![GitHub License](https://img.shields.io/github/license/adam-beckett-1999/Vikunja-Discord-Bot)
 
 ---
 
-![Vikunja Discord Bot GIF Example 1](demo/Vikunja%20Bot%20Demo%201.gif)
+![Vikunja Discord Bot GIF Example 1](media/vikunja-discord-bot-demo-1.gif)
 
-![Vikunja Discord Bot GIF Example 2](demo/Vikunja%20Bot%20Demo%202.gif)
+![Vikunja Discord Bot GIF Example 2](media/vikunja-discord-bot-demo-2.gif)
 
 ## How it works
 

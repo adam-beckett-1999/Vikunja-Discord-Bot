@@ -1,4 +1,4 @@
-![Vikunja Discord Bot Banner](/demo/vikunja-discord-bot-banner-with-background.png)
+![Vikunja Discord Bot Banner](/media/vikunja-discord-bot-banner-with-background.png)
 
 ---
 
