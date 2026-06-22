@@ -27,6 +27,12 @@ The webhook server verifies `X-Vikunja-Signature` headers using constant-time co
 The Vikunja API client sets a 15 000 ms timeout on all requests to prevent indefinite hangs.
 **Do not suggest removing or increasing this timeout without justification.**
 
+### `TZ` validation
+
+`TZ` is intentionally required and validated as an IANA timezone at startup (via Luxon), so
+misconfiguration fails fast instead of surfacing as runtime `Invalid DateTime` output.
+**Do not claim `TZ` lacks validation unless this check has actually been removed.**
+
 ### Vikunja task listing `per_page` value
 
 Task-listing flows intentionally set `per_page: 50` (the Vikunja API max) so Discord-side

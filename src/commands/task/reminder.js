@@ -18,6 +18,8 @@ import { buildErrorEmbed, buildTaskEmbed } from '../../utils/embeds.js';
 import { extractTaskReminderInstants, formatReminderInstantForDisplay } from '../../utils/task-reminders.js';
 import { getTaskUpdateHighlightFromTasks } from '../../utils/task-update-highlight.js';
 
+const MAX_EMBED_FIELD_VALUE_LENGTH = 1024;
+
 export const data = new SlashCommandBuilder()
   .setName('task-reminder')
   .setDescription('Add, list, or remove reminders on a Vikunja task (YYYY-MM-DD HH:mm)')
@@ -123,11 +125,39 @@ export async function execute(interaction) {
         .setTimestamp();
 
       embed.addFields({ name: 'Project', value: project.title, inline: true });
+
+      const reminderLines = reminders.map((value, index) => (
+        (index + 1) + '. ' + formatReminderForConfiguredTimeZone(value)
+      ));
+
+      let reminderFieldValue = 'none';
+      if (reminderLines.length) {
+        const shownLines = [];
+        for (const line of reminderLines) {
+          const candidate = shownLines.length ? shownLines.join('\n') + '\n' + line : line;
+          if (candidate.length > MAX_EMBED_FIELD_VALUE_LENGTH) break;
+          shownLines.push(line);
+        }
+
+        const omittedCount = reminderLines.length - shownLines.length;
+        if (omittedCount > 0) {
+          const omittedLine = '...and ' + omittedCount + ' more';
+          while (shownLines.length) {
+            const candidateWithOmitted = shownLines.join('\n') + '\n' + omittedLine;
+            if (candidateWithOmitted.length <= MAX_EMBED_FIELD_VALUE_LENGTH) {
+              break;
+            }
+            shownLines.pop();
+          }
+          shownLines.push(omittedLine);
+        }
+
+        reminderFieldValue = shownLines.join('\n').slice(0, MAX_EMBED_FIELD_VALUE_LENGTH);
+      }
+
       embed.addFields({
         name: 'Reminders',
-        value: reminders.length
-          ? reminders.map((value, index) => (index + 1) + '. ' + formatReminderForConfiguredTimeZone(value)).join('\n')
-          : 'none',
+        value: reminderFieldValue,
       });
 
       await interaction.editReply({

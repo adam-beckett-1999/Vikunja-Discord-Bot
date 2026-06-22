@@ -162,10 +162,7 @@ export async function autocomplete(interaction) {
 }
 
 function buildWebhookTargetUrl() {
-  const baseUrl = String(config.bot.publicUrl ?? '').trim();
-  if (!baseUrl) {
-    throw new Error('Missing required environment variable: BOT_PUBLIC_URL');
-  }
+  const baseUrl = config.bot.publicUrl;
 
   let parsed;
   try {

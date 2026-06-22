@@ -130,6 +130,19 @@ function resolveSecretsForPayload(payload, webhookRecords) {
       .filter(Boolean);
   }
 
+  const taskCollectionProjectIds = [...new Set(
+    extractTaskCollection(payload)
+      .map((task) => Number(task?.project_id ?? task?.project?.id))
+      .filter((id) => Number.isFinite(id))
+  )];
+
+  if (taskCollectionProjectIds.length) {
+    return webhookRecords
+      .filter((record) => taskCollectionProjectIds.includes(Number(record.projectId)))
+      .map((record) => record.secret)
+      .filter(Boolean);
+  }
+
   const configuredWebhookUrl = normalizeUrlForCompare(getConfiguredWebhookUrl());
   const matchingByUrl = configuredWebhookUrl
     ? webhookRecords.filter((record) => normalizeUrlForCompare(record.targetUrl) === configuredWebhookUrl)

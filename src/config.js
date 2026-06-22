@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { DateTime } from 'luxon';
 
 function requireEnv(name) {
   const value = process.env[name]?.trim();
@@ -18,9 +19,22 @@ function parsePositiveInt(value, fallback) {
   return fallback;
 }
 
+function requireIanaTimezone(name) {
+  const value = requireEnv(name);
+  const probe = DateTime.now().setZone(value);
+  if (!probe.isValid) {
+    throw new Error(
+      'Invalid IANA timezone in ' + name + ': ' + value
+      + '. Examples: UTC, Europe/London, America/New_York'
+    );
+  }
+
+  return value;
+}
+
 export default {
   bot: {
-    timeZone: requireEnv('TZ'),
+    timeZone: requireIanaTimezone('TZ'),
     publicUrl: requireEnv('BOT_PUBLIC_URL'),
   },
   discord: {
