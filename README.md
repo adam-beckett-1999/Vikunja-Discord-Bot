@@ -1,6 +1,6 @@
 ![Vikunja Discord Bot Banner](media/vikunja-discord-bot-banner-with-background.png)
 
-![Docker Pulls](https://img.shields.io/docker/pulls/adambeckett1999/vikunja-discord-bot?style=for-the-badge) ![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/adam-beckett-1999/Vikunja-Discord-Bot/docker-build-push-dev.yml?label=dev-build&style=for-the-badge) ![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/adam-beckett-1999/Vikunja-Discord-Bot/docker-build-push-release.yml?label=release-build&style=for-the-badge) ![GitHub last commit](https://img.shields.io/github/last-commit/adam-beckett-1999/Vikunja-Discord-Bot?style=for-the-badge) ![GitHub Issues or Pull Requests](https://img.shields.io/github/issues/adam-beckett-1999/Vikunja-Discord-Bot?style=for-the-badge) ![GitHub License](https://img.shields.io/github/license/adam-beckett-1999/Vikunja-Discord-Bot?style=for-the-badge)
+[![Docker Pulls](https://img.shields.io/docker/pulls/adambeckett1999/vikunja-discord-bot?style=for-the-badge&logo=docker)](https://hub.docker.com/r/adambeckett1999/vikunja-discord-bot) ![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/adam-beckett-1999/Vikunja-Discord-Bot/docker-build-push-dev.yml?label=dev-build&style=for-the-badge) ![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/adam-beckett-1999/Vikunja-Discord-Bot/docker-build-push-release.yml?label=release-build&style=for-the-badge) ![GitHub last commit](https://img.shields.io/github/last-commit/adam-beckett-1999/Vikunja-Discord-Bot?style=for-the-badge) ![GitHub Issues or Pull Requests](https://img.shields.io/github/issues/adam-beckett-1999/Vikunja-Discord-Bot?style=for-the-badge) ![GitHub License](https://img.shields.io/github/license/adam-beckett-1999/Vikunja-Discord-Bot?style=for-the-badge)
 
 ---
 
@@ -69,12 +69,17 @@ Set these in `.env` in the same folder as your compose file, or ensure you inclu
 
 ### Deploy the service
 
+Choose your preferred registry image:
+
+- Docker Hub: `adambeckett1999/vikunja-discord-bot:latest`
+- GHCR: `ghcr.io/adam-beckett-1999/vikunja-discord-bot:latest`
+
 Docker-compose:
 
 ```yaml
 services:
   vikunja-discord-bot:
-    image: adambeckett1999/vikunja-discord-bot:latest
+    image: ghcr.io/adam-beckett-1999/vikunja-discord-bot:latest
     container_name: vikunja-discord-bot
     restart: unless-stopped
     security_opt:
@@ -97,8 +102,10 @@ Published images include multi-architecture support for `linux/amd64`, `linux/ar
 Manual run:
 
 ```bash
-docker run --rm -p ${WEBHOOK_PORT:-3000}:${WEBHOOK_PORT:-3000} -v vikunja-discord-bot-data:/data --env-file /YOUR/FILE/LOCATION/HERE/.env adambeckett1999/vikunja-discord-bot:latest
+docker run --rm -p ${WEBHOOK_PORT:-3000}:${WEBHOOK_PORT:-3000} -v vikunja-discord-bot-data:/data --env-file /YOUR/FILE/LOCATION/HERE/.env ghcr.io/adam-beckett-1999/vikunja-discord-bot:latest
 ```
+
+Prefer Docker Hub instead? Replace the image with `adambeckett1999/vikunja-discord-bot:latest`.
 
 Once the container is running, the slash commands should register within discord. You may need to check the permissions on your bot within the server.
 
