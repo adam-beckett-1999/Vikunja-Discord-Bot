@@ -495,9 +495,15 @@ function getTaskIdFromPayload(payload, task) {
     payload?.task_id,
     payload?.data?.task?.id,
     payload?.task?.id,
-    payload?.data?.id,
-    payload?.id,
   ];
+
+  // Avoid treating arbitrary payload.data.id values (comment IDs, attachment IDs, etc.) as task IDs.
+  if (isTaskLike(payload?.data)) {
+    candidates.push(payload.data.id);
+  }
+  if (isTaskLike(payload)) {
+    candidates.push(payload.id);
+  }
 
   for (const candidate of candidates) {
     const numeric = Number(candidate);
