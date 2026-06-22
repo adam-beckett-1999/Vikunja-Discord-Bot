@@ -92,6 +92,8 @@ volumes:
   vikunja-discord-bot-data:
 ```
 
+Published images include multi-architecture support for `linux/amd64`, `linux/arm64`, and `linux/arm/v7`.
+
 Manual run:
 
 ```bash

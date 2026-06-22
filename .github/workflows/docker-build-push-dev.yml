@@ -12,13 +12,22 @@ permissions:
 jobs:
   docker-build-push:
     runs-on: ubuntu-latest
+    concurrency:
+      group: docker-dev-${{ github.ref }}
+      cancel-in-progress: true
     env:
       IMAGE_NAME: ${{ secrets.DOCKERHUB_USERNAME }}/vikunja-discord-bot
+      BUILD_PLATFORMS: linux/amd64,linux/arm64,linux/arm/v7
       DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64,arm
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
@@ -36,7 +45,6 @@ jobs:
           images: ${{ env.IMAGE_NAME }}
           tags: |
             type=raw,value=dev
-            type=sha,prefix=sha-
 
       - name: Build and push
         uses: docker/build-push-action@v7
@@ -44,8 +52,17 @@ jobs:
           context: .
           file: Dockerfile
           push: true
+          platforms: ${{ env.BUILD_PLATFORMS }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+
+      - name: Cleanup build cache and images
+        if: always()
+        run: |
+          docker buildx prune --all --force || true
+          docker system prune --all --force --volumes || true
 
       - name: Discord Notification (Success)
         if: success() && env.DISCORD_WEBHOOK_URL != ''
