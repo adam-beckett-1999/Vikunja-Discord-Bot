@@ -10,6 +10,7 @@ import { autocompleteProjects, resolveProjectSelection } from '../../services/vi
 import { buildTaskListEmbed, buildErrorEmbed } from '../../utils/embeds.js';
 
 const TASK_LIST_PAGE_SIZE = 10;
+const VIKUNJA_MAX_PER_PAGE = 50;
 
 export const data = new SlashCommandBuilder()
   .setName('task-list')
@@ -33,7 +34,7 @@ export async function execute(interaction) {
   const projectSelection = interaction.options.getString('project');
   const search = interaction.options.getString('search') ?? undefined;
 
-  const params = { page: 1 };
+  const params = { page: 1, per_page: VIKUNJA_MAX_PER_PAGE };
   if (search) params.s = search;
 
   try {
@@ -52,7 +53,7 @@ export async function execute(interaction) {
         if (!shouldRetryWithoutServerSearch(err, search)) throw err;
 
         logTaskListSearchFallback('project', search, err);
-        const fallbackParams = { page: 1 };
+        const fallbackParams = { page: 1, per_page: VIKUNJA_MAX_PER_PAGE };
         return getTasksByProject(project.id, fallbackParams);
       });
       title = 'Tasks in ' + project.title;
@@ -73,7 +74,7 @@ export async function execute(interaction) {
         }
 
         logTaskListSearchFallback('all', search, err);
-        const fallbackParams = { page: 1 };
+        const fallbackParams = { page: 1, per_page: VIKUNJA_MAX_PER_PAGE };
         return getAllTasks(fallbackParams).catch(async (fallbackErr) => {
           logTaskListSearchAllProjectsFallback(search, fallbackErr);
           return {
@@ -160,7 +161,7 @@ async function getAllTasksAcrossProjects() {
   );
 
   const responses = await Promise.all(projects.map((project) => (
-    getTasksByProject(project.id, { page: 1 }).catch((err) => {
+    getTasksByProject(project.id, { page: 1, per_page: VIKUNJA_MAX_PER_PAGE }).catch((err) => {
       const status = Number(err?.response?.status);
       const message = String(err?.response?.data?.message ?? err?.message ?? 'unknown error');
       console.warn(

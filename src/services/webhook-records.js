@@ -124,7 +124,7 @@ export async function upsertWebhookRecord(recordInput) {
       updatedAt,
     };
 
-    const existingIndex = store.records.findIndex((record) => record.projectId === projectId);
+    const existingIndex = store.records.findIndex((record) => record.webhookId === webhookId);
     if (existingIndex >= 0) {
       store.records[existingIndex] = nextRecord;
     } else {

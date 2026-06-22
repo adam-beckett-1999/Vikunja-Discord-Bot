@@ -131,9 +131,13 @@ function resolveSecretsForPayload(payload, webhookRecords) {
   const projectId = getProjectIdFromPayload(payload);
 
   if (projectId !== null) {
-    const projectRecord = candidateRecords.find((record) => Number(record.projectId) === Number(projectId));
-    if (projectRecord?.secret) {
-      return [projectRecord.secret];
+    const projectSecrets = candidateRecords
+      .filter((record) => Number(record.projectId) === Number(projectId))
+      .map((record) => record.secret)
+      .filter(Boolean);
+
+    if (projectSecrets.length) {
+      return projectSecrets;
     }
   }
 

@@ -26,3 +26,9 @@ The webhook server verifies `X-Vikunja-Signature` headers using constant-time co
 
 The Vikunja API client sets a 15 000 ms timeout on all requests to prevent indefinite hangs.
 **Do not suggest removing or increasing this timeout without justification.**
+
+### Vikunja task listing `per_page` value
+
+Task-listing flows intentionally set `per_page: 50` (the Vikunja API max) so Discord-side
+pagination can work over the largest single API page instead of an arbitrary server default.
+**Do not flag explicit `per_page: 50` usage in task-list queries as an issue.**
