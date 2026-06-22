@@ -122,6 +122,17 @@ function normalizeUrlForCompare(urlValue) {
 }
 
 function resolveSecretsForPayload(payload, webhookRecords) {
+  const eventType = String(getWebhookEventType(payload) ?? '').toLowerCase();
+  if (eventType.startsWith('project.')) {
+    const projectEntityId = Number(payload?.data?.id);
+    if (Number.isFinite(projectEntityId)) {
+      return webhookRecords
+        .filter((record) => Number(record.projectId) === Number(projectEntityId))
+        .map((record) => record.secret)
+        .filter(Boolean);
+    }
+  }
+
   const projectId = getProjectIdFromPayload(payload);
   if (projectId !== null) {
     return webhookRecords
