@@ -12,6 +12,7 @@ function requireEnv(name) {
 export default {
   bot: {
     timeZone: requireEnv('TZ'),
+    publicUrl: requireEnv('BOT_PUBLIC_URL'),
   },
   discord: {
     token: process.env.DISCORD_TOKEN,

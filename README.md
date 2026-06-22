@@ -52,11 +52,12 @@ Set these in `.env` in the same folder as your compose file, or ensure you inclu
 | Variable | Required | Purpose |
 |---|---|---|
 | `TZ` | Yes | Bot timezone |
+| `WEBHOOK_PORT` | No | Webhook port (default `3000`) |
+| `BOT_PUBLIC_URL` | Yes | Public base URL for the bot |
 | `DISCORD_TOKEN` | Yes | Bot token |
 | `DISCORD_CLIENT_ID` | Yes | Application client ID |
 | `VIKUNJA_BASE_URL` | Yes | Vikunja base URL |
 | `VIKUNJA_API_TOKEN` | Yes | Vikunja API token |
-| `WEBHOOK_PORT` | No | Webhook port (default `3000`) |
 
 ### Deploy the service
 
@@ -95,19 +96,18 @@ The bot should already be invited to the server before the container starts so t
 
 You will need the bot to be publicly accessible for the webhook handling to work correctly. The easiest method is through a reverse proxy. If you're already self-hosting Vikunja, you probably have a reverse proxy solution in place.
 
-Create a new proxy forwarding to the IP and port of the bot container, and use the HTTPS URL for the next steps.
-The target URL must resolve to the bot webhook endpoint path (`/webhook`).
+Set `BOT_PUBLIC_URL` to the public base URL of your bot, for example `https://your-bot.example.com`. The bot will automatically append `/webhook` when registering webhooks.
 
 When using the command, the webhook will be mapped to the channel where you've run the command, so posts to the defined project will appear in that channel. If you define the channel when running the command, you can bind that webhook to any other channel the bot has permission to post in.
 
 ```text
-/webhook-register project:<project_name> url:https://your-bot.example.com/webhook events:task.created, task.updated, task.comment.created
+/webhook-register project:<project_name> events:task.created, task.updated, task.comment.created
 ```
 
 Optional channel mapping while registering:
 
 ```text
-/webhook-register project:<project_name> url:https://your-bot.example.com/webhook channel:#alerts events:task.created,task.updated,task.reminder.fired
+/webhook-register project:<project_name> channel:#alerts events:task.created,task.updated,task.reminder.fired
 ```
 
 The `events` option is optional and free-text. If omitted, the default lifecycle events are used: `task.created`, `task.updated`, `task.deleted`, and `task.reminder.fired`.

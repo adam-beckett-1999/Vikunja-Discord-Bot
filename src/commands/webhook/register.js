@@ -1,5 +1,6 @@
 import { ChannelType, SlashCommandBuilder } from 'discord.js';
 import { createWebhook } from '../../services/vikunja.js';
+import config from '../../config.js';
 import { autocompleteProjects, resolveProjectSelection } from '../../services/vikunja-lookups.js';
 import { setProjectChannelLink } from '../../services/project-channel-links.js';
 import { generateWebhookSecret, upsertWebhookRecord } from '../../services/webhook-records.js';
@@ -17,11 +18,6 @@ export const data = new SlashCommandBuilder()
       .setDescription('Project to register the webhook on')
       .setRequired(true)
       .setAutocomplete(true)
-  )
-  .addStringOption((opt) =>
-    opt.setName('url')
-      .setDescription('Publicly reachable URL of this bot\'s webhook endpoint (e.g. https://example.com/webhook)')
-      .setRequired(true)
   )
   .addStringOption((opt) =>
     opt.setName('events')
@@ -43,23 +39,9 @@ export async function execute(interaction) {
   await interaction.deferReply({ ephemeral: true });
 
   const projectSelection = interaction.options.getString('project', true);
-  const targetUrlInput = interaction.options.getString('url', true);
   const rawEvents = interaction.options.getString('events');
   const selectedChannel = interaction.options.getChannel('channel');
   const targetChannelId = selectedChannel?.id ?? interaction.channelId;
-
-  let targetUrl;
-  let urlAutoAdjusted = false;
-  try {
-    const normalized = normalizeWebhookTargetUrl(targetUrlInput);
-    targetUrl = normalized.url;
-    urlAutoAdjusted = normalized.autoAdjusted;
-  } catch (err) {
-    await interaction.editReply({
-      embeds: [buildErrorEmbed(err.message)],
-    });
-    return;
-  }
 
   const requestedHelp = rawEvents?.trim().toLowerCase() === 'help';
   if (requestedHelp) {
@@ -104,6 +86,7 @@ export async function execute(interaction) {
 
   try {
     const secret = generateWebhookSecret();
+    const targetUrl = buildWebhookTargetUrl();
     const res = await createWebhook(project.id, targetUrl, events, secret);
     await setProjectChannelLink(project.id, targetChannelId);
     await upsertWebhookRecord({
@@ -118,9 +101,6 @@ export async function execute(interaction) {
     const channelSummary = targetChannelId
       ? '\nDiscord channel: <#' + targetChannelId + '>'
       : '';
-    const urlAdjustSummary = urlAutoAdjusted
-      ? '\nURL note: no path was provided, so `/webhook` was appended automatically.'
-      : '';
 
     await interaction.editReply({
       embeds: [
@@ -129,7 +109,6 @@ export async function execute(interaction) {
           'Vikunja will now POST the selected events to `' + targetUrl + '`.' +
           eventsSummary +
           channelSummary +
-          urlAdjustSummary +
           '\n\nTip: set `events:help` in this command to view format and common event meanings.' +
           '\nA webhook secret was generated and recorded locally for this webhook.'
         ),
@@ -154,32 +133,31 @@ export async function autocomplete(interaction) {
   await interaction.respond([]);
 }
 
-function normalizeWebhookTargetUrl(rawValue) {
+function buildWebhookTargetUrl() {
+  const baseUrl = String(config.bot.publicUrl ?? '').trim();
+  if (!baseUrl) {
+    throw new Error('Missing required environment variable: BOT_PUBLIC_URL');
+  }
+
   let parsed;
   try {
-    parsed = new URL(String(rawValue ?? '').trim());
+    parsed = new URL(baseUrl);
   } catch {
-    throw new Error('Invalid URL. Please provide a full URL like `https://your-bot.example.com/webhook`.');
+    throw new Error('BOT_PUBLIC_URL must be a valid public URL like `https://your-bot.example.com`.');
   }
 
   if (!['http:', 'https:'].includes(parsed.protocol)) {
-    throw new Error('Webhook URL must start with `http://` or `https://`.');
+    throw new Error('BOT_PUBLIC_URL must start with `http://` or `https://`.');
   }
 
-  const compactPath = parsed.pathname.replace(/\/+$/, '');
-  let autoAdjusted = false;
-
-  if (!compactPath || compactPath === '/') {
+  const basePath = parsed.pathname.replace(/\/+$/, '');
+  if (!basePath || basePath === '/') {
     parsed.pathname = '/webhook';
-    autoAdjusted = true;
-  } else if (compactPath !== '/webhook') {
-    throw new Error('Webhook URL path must be `/webhook` (example: `https://your-bot.example.com/webhook`).');
+  } else if (basePath.endsWith('/webhook')) {
+    parsed.pathname = basePath;
   } else {
-    parsed.pathname = '/webhook';
+    parsed.pathname = basePath + '/webhook';
   }
 
-  return {
-    url: parsed.toString(),
-    autoAdjusted,
-  };
+  return parsed.toString();
 }

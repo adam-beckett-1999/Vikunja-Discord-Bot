@@ -77,7 +77,7 @@ async function getConnectedGuildIds(token) {
         return;
       }
 
-      client.once('ready', resolve);
+      client.once('clientReady', resolve);
     });
 
     return [...client.guilds.cache.keys()];
