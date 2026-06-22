@@ -33,7 +33,7 @@ export async function execute(interaction, commands) {
     console.error('[Interaction] Unknown command: ' + interaction.commandName);
     await interaction.reply({
       embeds: [buildErrorEmbed('Unknown command: `' + interaction.commandName + '`')],
-      ephemeral: true,
+      flags: 64,
     });
     return;
   }
@@ -46,7 +46,7 @@ export async function execute(interaction, commands) {
     if (interaction.deferred || interaction.replied) {
       await interaction.editReply({ embeds: [embed] }).catch(() => {});
     } else {
-      await interaction.reply({ embeds: [embed], ephemeral: true }).catch(() => {});
+      await interaction.reply({ embeds: [embed], flags: 64 }).catch(() => {});
     }
   }
 }
