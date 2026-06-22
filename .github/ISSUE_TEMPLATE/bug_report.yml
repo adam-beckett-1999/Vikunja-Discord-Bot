@@ -1,0 +1,28 @@
+name: Bug report
+description: Report a problem or unexpected behavior
+title: "bug: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use the fields below to describe the problem clearly. Including screenshots, error messages, and steps to reproduce the issue will help us diagnose and fix it faster.
+
+  - type: textarea
+    id: issue_description
+    attributes:
+      label: Issue description
+      description: Clearly explain the bug, including what happened and what you expected to happen.
+      placeholder: A clear and concise description of the issue.
+    validations:
+      required: true
+
+  - type: textarea
+    id: screenshots_or_logs
+    attributes:
+      label: Screenshots or logs (optional)
+      description: Add any relevant screenshots, error output, or logs that may help diagnose the issue.
+      placeholder: Paste screenshots, stack traces, or log snippets here.
+    validations:
+      required: false

@@ -1,0 +1,19 @@
+name: Feature request
+description: Suggest an idea or enhancement
+title: "feat: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use the field below to describe the requested feature.
+
+  - type: textarea
+    id: feature_description
+    attributes:
+      label: Feature description
+      description: Describe the requested feature and what problem it solves.
+      placeholder: A clear and concise description of the requested feature.
+    validations:
+      required: true
