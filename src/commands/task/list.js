@@ -14,11 +14,6 @@ export const data = new SlashCommandBuilder()
   .addStringOption((opt) =>
     opt.setName('search')
       .setDescription('Search string to filter tasks by title')
-  )
-  .addIntegerOption((opt) =>
-    opt.setName('page')
-      .setDescription('Page number (default: 1)')
-      .setMinValue(1)
   );
 
 /**
@@ -29,9 +24,8 @@ export async function execute(interaction) {
 
   const projectSelection = interaction.options.getString('project');
   const search = interaction.options.getString('search') ?? undefined;
-  const page = interaction.options.getInteger('page') ?? 1;
 
-  const params = { page };
+  const params = { page: 1 };
   if (search) params.s = search;
 
   try {
@@ -46,19 +40,62 @@ export async function execute(interaction) {
         return;
       }
 
-      res = await getTasksByProject(project.id, params);
+      res = await getTasksByProject(project.id, params).catch(async (err) => {
+        if (!shouldRetryWithoutServerSearch(err, search)) throw err;
+
+        logTaskListSearchFallback('project', search, err);
+        const fallbackParams = { page: 1 };
+        return getTasksByProject(project.id, fallbackParams);
+      });
       title = 'Tasks in ' + project.title;
     } else {
-      res = await getAllTasks(params);
+      res = await getAllTasks(params).catch(async (err) => {
+        if (!shouldRetryWithoutServerSearch(err, search)) throw err;
+
+        logTaskListSearchFallback('all', search, err);
+        const fallbackParams = { page: 1 };
+        return getAllTasks(fallbackParams);
+      });
       title = 'All Tasks';
     }
 
-    const tasks = Array.isArray(res.data) ? res.data : [];
+    let tasks = Array.isArray(res.data) ? res.data : [];
+    if (search) {
+      const needle = normalizeSearch(search);
+      tasks = tasks.filter((task) => normalizeSearch(task?.title).includes(needle));
+    }
+
     await interaction.editReply({ embeds: [buildTaskListEmbed(tasks, title)] });
   } catch (err) {
     const msg = err.response?.data?.message ?? err.message;
     await interaction.editReply({ embeds: [buildErrorEmbed('Failed to list tasks: ' + msg)] });
   }
+}
+
+function shouldRetryWithoutServerSearch(err, search) {
+  if (!search) return false;
+
+  const status = Number(err?.response?.status);
+  if (status !== 400) return false;
+
+  const message = String(err?.response?.data?.message ?? err?.message ?? '').toLowerCase();
+  return message.includes('invalid model');
+}
+
+function normalizeSearch(value) {
+  return String(value ?? '').trim().toLowerCase();
+}
+
+function logTaskListSearchFallback(scope, search, err) {
+  const status = Number(err?.response?.status);
+  const message = String(err?.response?.data?.message ?? err?.message ?? 'unknown error');
+  console.warn(
+    '[task-list] Falling back to client-side search'
+    + ' | scope=' + scope
+    + ' | query="' + String(search ?? '') + '"'
+    + ' | status=' + (Number.isFinite(status) ? String(status) : 'n/a')
+    + ' | reason=' + message
+  );
 }
 
 export async function autocomplete(interaction) {
