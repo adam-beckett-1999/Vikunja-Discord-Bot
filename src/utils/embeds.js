@@ -428,9 +428,17 @@ export function buildTaskListEmbedWithOptions(tasks, title, options = {}) {
 
     const parts = [
       'Status: ' + getTaskListStatus(task, now),
-      'Priority: ' + formatTaskListPriority(task),
-      'Due: ' + formatTaskListDueDate(task),
     ];
+
+    const priority = Number(task?.priority ?? 0);
+    if (priority !== 0) {
+      parts.push('Priority: ' + formatTaskListPriority(task));
+    }
+
+    const dueDate = formatTaskListDueDate(task);
+    if (dueDate !== '-') {
+      parts.push('Due: ' + dueDate);
+    }
 
     if (hasMultipleProjects) {
       parts.push('Project: ' + truncateCell(getTaskProjectLabel(task), 28));
@@ -478,8 +486,20 @@ export function buildTaskListEmbedWithOptions(tasks, title, options = {}) {
 function truncateCell(value, width) {
   const text = String(value ?? '');
   if (text.length <= width) return text;
-  if (width <= 1) return text.slice(0, width);
-  return text.slice(0, width - 1) + '.';
+
+  const ellipsis = '...';
+  if (width <= ellipsis.length) return text.slice(0, width);
+
+  const maxContentLength = width - ellipsis.length;
+  const wordBoundary = text.lastIndexOf(' ', maxContentLength);
+  if (wordBoundary > 0) {
+    const truncated = text.slice(0, wordBoundary).trimEnd();
+    if (truncated) {
+      return truncated + ellipsis;
+    }
+  }
+
+  return text.slice(0, maxContentLength).trimEnd() + ellipsis;
 }
 
 function getTaskStatusIcon(task, now) {
