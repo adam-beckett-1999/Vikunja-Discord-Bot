@@ -477,6 +477,27 @@ export function buildTaskOpenLinkComponents(task) {
 }
 
 /**
+ * Build an Open button component row for a project if a valid Vikunja base URL is configured.
+ *
+ * @param {object|number|string} project
+ * @returns {ActionRowBuilder<ButtonBuilder>[]|undefined}
+ */
+export function buildProjectOpenLinkComponents(project) {
+  const projectUrl = buildProjectUrl(project);
+  if (!projectUrl) return undefined;
+
+  const row = new ActionRowBuilder()
+    .addComponents(
+      new ButtonBuilder()
+        .setLabel('Open')
+        .setStyle(ButtonStyle.Link)
+        .setURL(projectUrl)
+    );
+
+  return [row];
+}
+
+/**
  * Resolve the Vikunja web URL for a task.
  * Standard Vikunja frontend route is /tasks/:id.
  *
@@ -491,6 +512,23 @@ export function buildTaskUrl(task) {
   if (!webBaseUrl) return null;
 
   return webBaseUrl + '/tasks/' + taskId;
+}
+
+/**
+ * Resolve the Vikunja web URL for a project.
+ * Standard Vikunja frontend route is /projects/:id/tasks.
+ *
+ * @param {object|number|string} project
+ * @returns {string|null}
+ */
+export function buildProjectUrl(project) {
+  const projectId = Number(typeof project === 'object' ? project?.id : project);
+  if (!Number.isFinite(projectId)) return null;
+
+  const webBaseUrl = resolveVikunjaWebBaseUrl();
+  if (!webBaseUrl) return null;
+
+  return webBaseUrl + '/projects/' + projectId + '/tasks';
 }
 
 function resolveVikunjaWebBaseUrl() {

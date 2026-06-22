@@ -5,6 +5,7 @@ import { getProject, getTask } from '../services/vikunja.js';
 import {
   buildReminderFiredEmbed,
   buildTaskEmbed,
+  buildProjectOpenLinkComponents,
   buildTaskOpenLinkComponents,
   formatTaskDescription,
 } from '../utils/embeds.js';
@@ -187,14 +188,35 @@ async function postNotification(discordClient, eventType, payload) {
   let embed;
   if (task && eventType === 'task.deleted') {
     // On deletion, the task may only have an ID – build a minimal embed.
+    const projectId = getTaskProjectIdForDeletedTask(task, payload) ?? getProjectIdFromPayload(payload);
+    const taskSnapshot = task?.id !== undefined ? getCachedTaskSnapshot(task.id) : undefined;
+    const projectTitle = projectId !== null
+      ? taskSnapshot?.project?.title
+        ?? taskSnapshot?.project_title
+        ?? getCachedProjectTitle(projectId)
+        ?? ('Project #' + projectId)
+      : null;
+    const openButtonSource = projectId ?? taskSnapshot?.project_id ?? taskSnapshot?.project?.id ?? null;
+
     embed = new EmbedBuilder()
       .setColor(0xe74c3c)
       .setTitle('Deleted: ' + (task.title ?? 'Task ' + task.id))
       .setFooter({ text: 'Task ID: ' + task.id })
       .setTimestamp();
+
+    if (projectTitle) {
+      embed.addFields({ name: 'Project', value: String(projectTitle), inline: true });
+    }
+
     if (task.id !== undefined) {
       clearTaskSnapshot(task.id);
     }
+
+    await channel.send({
+      embeds: [embed],
+      components: openButtonSource !== null ? buildProjectOpenLinkComponents(openButtonSource) : undefined,
+    });
+    return;
   } else if (task) {
     if (eventType === 'task.reminder.fired') {
       let reminderTask = task;
@@ -285,6 +307,26 @@ async function resolveNotificationChannelId(payload, task, eventType) {
         logWebhook('warn', 'Resolved channel for ' + (eventType ?? 'unknown') + ' via hydrated task ' + taskId + ' -> project ' + hydratedProjectId + '.');
         return mappedChannelId;
       }
+    }
+  }
+
+  return null;
+}
+
+function getTaskProjectIdForDeletedTask(task, payload) {
+  const candidates = [
+    task?.project_id,
+    task?.project?.id,
+    payload?.data?.task?.project_id,
+    payload?.data?.task?.project?.id,
+    payload?.task?.project_id,
+    payload?.task?.project?.id,
+  ];
+
+  for (const candidate of candidates) {
+    const numeric = Number(candidate);
+    if (Number.isFinite(numeric)) {
+      return numeric;
     }
   }
 
