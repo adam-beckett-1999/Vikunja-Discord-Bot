@@ -36,7 +36,7 @@ export const data = new SlashCommandBuilder()
  * @param {import('discord.js').ChatInputCommandInteraction} interaction
  */
 export async function execute(interaction) {
-  await interaction.deferReply();
+  await interaction.deferReply({ flags: 64 });
 
   const projectSelection = interaction.options.getString('project', true);
   const project = await resolveProjectSelection(projectSelection);
@@ -67,7 +67,9 @@ export async function execute(interaction) {
 
   try {
     const res = await createTask(project.id, taskData);
-    await interaction.editReply({ embeds: [buildTaskEmbed(res.data, 'Created', project.title)] });
+    await interaction.editReply({
+      embeds: [buildTaskEmbed(res.data, 'Created', project.title)],
+    });
   } catch (err) {
     const msg = err.response?.data?.message ?? err.message;
     await interaction.editReply({ embeds: [buildErrorEmbed('Failed to create task: ' + msg)] });

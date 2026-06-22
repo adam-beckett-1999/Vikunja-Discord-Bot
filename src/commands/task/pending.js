@@ -1,5 +1,5 @@
 import { SlashCommandBuilder } from 'discord.js';
-import { deleteTask } from '../../services/vikunja.js';
+import { getTask, updateTask } from '../../services/vikunja.js';
 import {
   autocompleteProjects,
   autocompleteTasks,
@@ -7,11 +7,13 @@ import {
   resolveProjectSelection,
   resolveTaskSelection,
 } from '../../services/vikunja-lookups.js';
-import { buildErrorEmbed, buildSuccessEmbed } from '../../utils/embeds.js';
+import { cacheTaskSnapshot } from '../../services/task-update-context.js';
+import { getTaskUpdateHighlightFromTasks } from '../../utils/task-update-highlight.js';
+import { buildTaskEmbed, buildErrorEmbed } from '../../utils/embeds.js';
 
 export const data = new SlashCommandBuilder()
-  .setName('task-delete')
-  .setDescription('Delete a Vikunja task')
+  .setName('task-pending')
+  .setDescription('Mark a Vikunja task as pending')
   .addStringOption((opt) =>
     opt.setName('project')
       .setDescription('Project containing the task')
@@ -20,20 +22,16 @@ export const data = new SlashCommandBuilder()
   )
   .addStringOption((opt) =>
     opt.setName('task')
-      .setDescription('Task to delete')
+      .setDescription('Task to mark as pending')
       .setRequired(true)
       .setAutocomplete(true)
   );
 
-/**
- * @param {import('discord.js').ChatInputCommandInteraction} interaction
- */
 export async function execute(interaction) {
   await interaction.deferReply({ flags: 64 });
 
   const projectSelection = interaction.options.getString('project', true);
   const taskSelection = interaction.options.getString('task', true);
-
   const project = await resolveProjectSelection(projectSelection);
   if (!project) {
     await interaction.editReply({
@@ -50,14 +48,27 @@ export async function execute(interaction) {
     return;
   }
 
-  try {
-    await deleteTask(task.id);
+  if (task.done === false) {
     await interaction.editReply({
-      embeds: [buildSuccessEmbed('Task `' + task.title + '` has been deleted from `' + project.title + '`.')],
+      embeds: [buildErrorEmbed('Task is already marked as pending.')],
+    });
+    return;
+  }
+
+  try {
+    const res = await updateTask(task.id, { done: false });
+    const updatedTask = await getTask(task.id)
+      .then((response) => response.data)
+      .catch(() => res.data);
+
+    cacheTaskSnapshot(updatedTask);
+    const updateHighlight = getTaskUpdateHighlightFromTasks(task, updatedTask);
+    await interaction.editReply({
+      embeds: [buildTaskEmbed(updatedTask, 'Updated', project.title, updateHighlight)],
     });
   } catch (err) {
     const msg = err.response?.data?.message ?? err.message;
-    await interaction.editReply({ embeds: [buildErrorEmbed('Failed to delete task: ' + msg)] });
+    await interaction.editReply({ embeds: [buildErrorEmbed('Failed to update task: ' + msg)] });
   }
 }
 

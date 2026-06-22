@@ -7,7 +7,7 @@ import {
   resolveProjectSelection,
   resolveTaskSelection,
 } from '../../services/vikunja-lookups.js';
-import { cacheTaskSnapshot, markManualTaskUpdate } from '../../services/task-update-context.js';
+import { cacheTaskSnapshot } from '../../services/task-update-context.js';
 import { getTaskUpdateHighlightFromTasks } from '../../utils/task-update-highlight.js';
 import { buildTaskEmbed, buildErrorEmbed } from '../../utils/embeds.js';
 
@@ -51,17 +51,13 @@ export const data = new SlashCommandBuilder()
     opt.setName('priority')
       .setDescription('Priority')
       .addChoices(...PRIORITY_CHOICES)
-  )
-  .addBooleanOption((opt) =>
-    opt.setName('done')
-      .setDescription('Mark task as done or pending')
   );
 
 /**
  * @param {import('discord.js').ChatInputCommandInteraction} interaction
  */
 export async function execute(interaction) {
-  await interaction.deferReply();
+  await interaction.deferReply({ flags: 64 });
 
   const projectSelection = interaction.options.getString('project', true);
   const taskSelection = interaction.options.getString('task', true);
@@ -86,13 +82,11 @@ export async function execute(interaction) {
   const dueRaw = interaction.options.getString('due') ?? undefined;
   const priorityRaw = interaction.options.getString('priority') ?? undefined;
   const priority = priorityRaw !== undefined ? Number(priorityRaw) : undefined;
-  const done = interaction.options.getBoolean('done') ?? undefined;
 
   const taskData = {};
   if (title !== undefined) taskData.title = title;
   if (description !== undefined) taskData.description = description;
   if (priority !== undefined) taskData.priority = priority;
-  if (done !== undefined) taskData.done = done;
 
   if (dueRaw !== undefined) {
     const parsed = new Date(dueRaw);
@@ -125,10 +119,11 @@ export async function execute(interaction) {
       .then((response) => response.data)
       .catch(() => res.data);
 
-    markManualTaskUpdate(task.id);
     cacheTaskSnapshot(updatedTask);
     const updateHighlight = getTaskUpdateHighlightFromTasks(task, updatedTask);
-    await interaction.editReply({ embeds: [buildTaskEmbed(updatedTask, 'Updated', project.title, updateHighlight)] });
+    await interaction.editReply({
+      embeds: [buildTaskEmbed(updatedTask, 'Updated', project.title, updateHighlight)],
+    });
   } catch (err) {
     const msg = err.response?.data?.message ?? err.message;
     await interaction.editReply({ embeds: [buildErrorEmbed('Failed to update task: ' + msg)] });

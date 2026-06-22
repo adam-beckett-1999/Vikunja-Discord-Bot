@@ -8,11 +8,14 @@ Self-hosted Discord bot for Vikunja.
 
 ## How it works
 
-- Slash commands let you create, list, view, update, and delete tasks.
-- `/webhook-register` creates a Vikunja webhook for a project.
+- Slash commands let you create, list, view, update, delete, and manage assignees and reminders on tasks.
+- `/webhook-register` creates a Vikunja webhook for a project and can map that project to a Discord channel.
+- `/webhook-channel` lets you manage project-to-channel mappings (`set`, `remove`, `list`).
+- `/alert-assignee` lets you manage who gets pinged for reminder alerts (`link`, `unlink`, `list`).
 - Vikunja sends events to the bot webhook endpoint.
-- The bot posts those events to your chosen Discord channel as embeds.
-- If `WEBHOOK_SECRET` is set, the bot verifies incoming webhook signatures.
+- The bot posts those events to the mapped Discord channel for the matching project.
+- Webhook-delivered task embeds include an `Open` link button for the relevant Vikunja page.
+- The bot verifies incoming webhook signatures using per-webhook secrets stored in `/data`.
 
 ## What you need
 
@@ -48,16 +51,14 @@ Set these in `.env` in the same folder as your compose file, or ensure you inclu
 
 | Variable | Required | Purpose |
 |---|---|---|
-| `DISCORD_TOKEN` | Yes | Discord bot token |
-| `DISCORD_CLIENT_ID` | Yes | Discord application client ID |
-| `DISCORD_GUILD_IDS` | Yes | Discord guild IDs for instant slash command registration |
+| `TZ` | Yes | Bot timezone |
+| `WEBHOOK_PORT` | No | Webhook port (default `3000`) |
+| `WEBHOOK_MAX_BODY_KB` | No | Max webhook request body size in KB (default `256`) |
+| `BOT_PUBLIC_URL` | Yes | Public base URL for the bot |
+| `DISCORD_TOKEN` | Yes | Bot token |
+| `DISCORD_CLIENT_ID` | Yes | Application client ID |
 | `VIKUNJA_BASE_URL` | Yes | Vikunja base URL |
 | `VIKUNJA_API_TOKEN` | Yes | Vikunja API token |
-| `WEBHOOK_PORT` | Yes | Webhook server port (default `3000`) |
-| `WEBHOOK_SECRET` | No | Secret used to verify incoming Vikunja webhooks |
-| `NOTIFICATION_CHANNEL_ID` | Yes | Discord channel for webhook embeds |
-
----
 
 ### Deploy the service
 
@@ -69,19 +70,30 @@ services:
     image: adambeckett1999/vikunja-discord-bot:latest
     container_name: vikunja-discord-bot
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     env_file:
       - .env
     ports:
-      - "3000:3000"
+      - "${WEBHOOK_PORT:-3000}:${WEBHOOK_PORT:-3000}"
+    volumes:
+      - vikunja-discord-bot-data:/data
+
+volumes:
+  vikunja-discord-bot-data:
 ```
 
 Manual run:
 
 ```bash
-docker run --rm -p 3000:3000 --env-file /YOUR/FILE/LOCATION/HERE/.env adambeckett1999/vikunja-discord-bot:latest
+docker run --rm -p ${WEBHOOK_PORT:-3000}:${WEBHOOK_PORT:-3000} -v vikunja-discord-bot-data:/data --env-file /YOUR/FILE/LOCATION/HERE/.env adambeckett1999/vikunja-discord-bot:latest
 ```
 
 Once the container is running, the slash commands should register within discord. You may need to check the permissions on your bot within the server.
+
+The bot should already be invited to the server before the container starts so the deploy step can discover it automatically. If you add the bot to a server after the container is already running, restart the container so command deployment can re-authenticate and pick up the new guild.
 
 ---
 
@@ -89,14 +101,22 @@ Once the container is running, the slash commands should register within discord
 
 You will need the bot to be publicly accessible for the webhook handling to work correctly. The easiest method is through a reverse proxy. If you're already self-hosting Vikunja, you probably have a reverse proxy solution in place.
 
-Create a new proxy forwarding to the IP and port of the bot container, and use the HTTPS URL for the next steps.
+Set `BOT_PUBLIC_URL` to the public base URL of your bot, for example `https://your-bot.example.com`. The bot will automatically append `/webhook` when registering webhooks.
+
+When using the command, the webhook will be mapped to the channel where you've run the command, so posts to the defined project will appear in that channel. If you define the channel when running the command, you can bind that webhook to any other channel the bot has permission to post in.
 
 ```text
-/webhook-register project:<project_name> url:https://your-bot.example.com/webhook events:task.created, task.updated, task.comment.created
+/webhook-register project:<project_name> events:task.created, task.updated, task.comment.created
 ```
 
-The `events` option is optional and free-text. If omitted, the default lifecycle events are used: `task.created`, `task.updated`, and `task.deleted`.
-When provided, enter a comma-separated list of event names. The supports event types are listed below.
+Optional channel mapping while registering:
+
+```text
+/webhook-register project:<project_name> channel:#alerts events:task.created,task.updated,task.reminder.fired
+```
+
+The `events` option is optional and free-text. If omitted, the default lifecycle events are used: `task.created`, `task.updated`, `task.deleted`, and `task.reminder.fired`.
+When provided, enter a comma-separated list of event names. The supported event types are listed below.
 
 Format example:
 
@@ -126,21 +146,90 @@ task.created, task.updated, task.comment.created
 | `project.shared.team` | A project was shared with a team |
 | `project.shared.user` | A project was shared with a user |
 
-Vikunja will POST the selected events to the bot, which forwards them as Discord embeds to your `NOTIFICATION_CHANNEL_ID`.
-If `WEBHOOK_SECRET` is set, `/webhook-register` will include that same secret when creating the webhook so incoming deliveries can pass signature verification.
+`/webhook-register` generates a webhook secret automatically, sends it to Vikunja, and records it locally in `/data/webhook-records.json` so incoming deliveries can be verified later.
+
+You can use the following commands to list and update which projects/webhooks post to which channels:
+
+```text
+/webhook-channel set project:<project_name> channel:#alerts
+/webhook-channel remove project:<project_name>
+/webhook-channel list
+```
+
+---
+
+### Configure reminder pings by assignee
+
+Reminder notifications can now mention Discord users based on task assignees.
+
+1. Link a Vikunja assignee to a Discord user:
+
+```text
+/alert-assignee link assignee:<assignee> discord-user:@User
+```
+
+`assignee` is global to your connected Vikunja instance.
+Autocomplete suggests known assignees discovered from tasks. You can also enter `id:<vikunja_user_id>` or `username:<vikunja_username>` manually.
+
+1. Remove a link:
+
+```text
+/alert-assignee unlink assignee:<assignee>
+```
+
+1. Show current links:
+
+```text
+/alert-assignee list
+```
+
+When a `task.reminder.fired` webhook is received, the bot checks task assignees and mentions any linked Discord users in the notification message.
+
+### Manage task reminders
+
+Use `/task-reminder` to work with task reminder dates directly:
+
+```text
+/task-reminder add project:<project_name> task:<task_name> at:2026-06-21 18:00
+/task-reminder list project:<project_name> task:<task_name>
+/task-reminder remove project:<project_name> task:<task_name> reminder:<select from autocomplete>
+```
+
+`add` expects a date and time in `YYYY-MM-DD HH:mm` format, using a 24-hour clock in the bot's configured timezone.
+Set `TZ` to a valid IANA timezone (for example `UTC`) to control that timezone.
+For example: `2026-06-21 18:00`.
+`remove` supports autocomplete for reminder selection.
+
+### Task completion
+
+Use dedicated commands to change task completion status:
+
+```text
+/task-done project:<project_name> task:<task_name>
+/task-pending project:<project_name> task:<task_name>
+```
 
 ---
 
 ## Webhook Security
 
-When `WEBHOOK_SECRET` is set, the bot verifies the `X-Vikunja-Signature` HMAC-SHA256 header on every incoming webhook request. If you're manually creating the webhooks within Vikunja, set the same value when creating the webhook to ensure only legitimate requests are processed.
+When you register a webhook through `/webhook-register`, the bot generates a secret, stores it in `/data/webhook-records.json`, and uses that record to verify the `X-Vikunja-Signature` HMAC-SHA256 header on incoming webhook requests.
+
+Additional hardening applied by default:
+
+- Incoming webhook payloads are size-limited (`WEBHOOK_MAX_BODY_KB`, default `256`).
+- Signature verification is scoped to the matching project webhook record whenever possible.
+- Local data stores under `/data` are written with restricted permissions.
+
+Recommended operational hardening:
+
+- Restrict network access so only Vikunja (or your reverse proxy) can reach the webhook endpoint.
+- Terminate TLS at a reverse proxy and keep `BOT_PUBLIC_URL` on HTTPS.
+- Rotate Vikunja API tokens and Discord bot tokens if access to `.env` is ever exposed.
 
 ---
 
 ## Planned improvements
-
-- Support for multiple discord channels for webhook posts (defined by the '/webhook-register' command instead of statically set in .env)
-- Better handling for comments (show comment content in webhook post and new command e.g '/task-comment')
 
 If there's any features you would like to see, or any bugs/issues that need addressing, please create an issue.
 

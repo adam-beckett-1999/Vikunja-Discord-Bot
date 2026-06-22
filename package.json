@@ -23,9 +23,10 @@
   "homepage": "https://github.com/adam-beckett-1999/Vikunja-Discord-Bot#readme",
   "dependencies": {
     "@discordjs/rest": "^2.6.1",
-    "axios": "^1.16.0",
+    "axios": "^1.18.0",
     "discord.js": "^14.26.4",
-    "dotenv": "^16.6.1",
-    "express": "^5.2.1"
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "luxon": "^3.7.2"
   }
 }

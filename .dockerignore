@@ -1,8 +1,16 @@
-node_modules
-npm-debug.log
-.git
-.github
+# Keep the Docker build context minimal.
+**
+
+!package.json
+!package-lock.json
+!deploy-commands.js
+!src/
+!src/**
+
+# Local/runtime-only files that should never enter the image.
 .env
 .env.*
+node_modules
+npm-debug.log
 coverage
 *.log

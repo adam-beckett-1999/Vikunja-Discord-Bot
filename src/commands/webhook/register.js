@@ -1,7 +1,9 @@
-import { SlashCommandBuilder } from 'discord.js';
-import { createWebhook } from '../../services/vikunja.js';
+import { ChannelType, SlashCommandBuilder } from 'discord.js';
+import { createWebhook, deleteWebhook } from '../../services/vikunja.js';
 import config from '../../config.js';
 import { autocompleteProjects, resolveProjectSelection } from '../../services/vikunja-lookups.js';
+import { setProjectChannelLink, removeProjectChannelLink } from '../../services/project-channel-links.js';
+import { generateWebhookSecret, upsertWebhookRecord } from '../../services/webhook-records.js';
 import {
   formatWebhookEventsHelp,
   parseWebhookEventsInput,
@@ -18,14 +20,15 @@ export const data = new SlashCommandBuilder()
       .setAutocomplete(true)
   )
   .addStringOption((opt) =>
-    opt.setName('url')
-      .setDescription('Publicly reachable URL of this bot\'s webhook endpoint (e.g. https://example.com/webhook)')
-      .setRequired(true)
-  )
-  .addStringOption((opt) =>
     opt.setName('events')
       .setDescription('Comma-separated event names. Use "help" to show examples.')
       .setMaxLength(1000)
+      .setRequired(false)
+  )
+  .addChannelOption((opt) =>
+    opt.setName('channel')
+      .setDescription('Discord channel to receive webhook posts for this project (defaults to current channel)')
+      .addChannelTypes(ChannelType.GuildText)
       .setRequired(false)
   );
 
@@ -33,11 +36,26 @@ export const data = new SlashCommandBuilder()
  * @param {import('discord.js').ChatInputCommandInteraction} interaction
  */
 export async function execute(interaction) {
-  await interaction.deferReply({ ephemeral: true });
+  await interaction.deferReply({ flags: 64 });
 
   const projectSelection = interaction.options.getString('project', true);
-  const targetUrl = interaction.options.getString('url', true);
   const rawEvents = interaction.options.getString('events');
+  const selectedChannel = interaction.options.getChannel('channel');
+  const currentChannel = interaction.channel;
+
+  if (!selectedChannel && currentChannel?.type !== ChannelType.GuildText) {
+    await interaction.editReply({
+      embeds: [
+        buildErrorEmbed(
+          'This command was run outside a standard text channel. '
+          + 'Please provide `channel:` explicitly (Guild Text channel only).'
+        ),
+      ],
+    });
+    return;
+  }
+
+  const targetChannelId = selectedChannel?.id ?? interaction.channelId;
 
   const requestedHelp = rawEvents?.trim().toLowerCase() === 'help';
   if (requestedHelp) {
@@ -81,21 +99,46 @@ export async function execute(interaction) {
   }
 
   try {
-    const res = await createWebhook(project.id, targetUrl, events);
+    const secret = generateWebhookSecret();
+    const targetUrl = buildWebhookTargetUrl();
+    const res = await createWebhook(project.id, targetUrl, events, secret);
+    const webhookId = res.data.id;
 
-    const secretNote = config.webhook.secret
-      ? '\nUsing configured webhook secret for signature verification.'
-      : '';
+    try {
+      await setProjectChannelLink(project.id, targetChannelId);
+      await upsertWebhookRecord({
+        projectId: project.id,
+        webhookId,
+        targetUrl,
+        secret,
+        events,
+      });
+    } catch (storageErr) {
+      // Roll back the Vikunja webhook and any partial channel mapping so no
+      // orphaned webhook is left delivering events the bot cannot verify.
+      await deleteWebhook(project.id, webhookId).catch(() => {});
+      await removeProjectChannelLink(project.id).catch(() => {});
+      throw new Error(
+        'Webhook was registered in Vikunja but local records could not be saved '
+        + '(it has been deleted automatically). Please try again. '
+        + 'Detail: ' + (storageErr?.message ?? String(storageErr))
+      );
+    }
+
     const eventsSummary = '\nEvents: `' + events.join('`, `') + '`';
+    const channelSummary = targetChannelId
+      ? '\nDiscord channel: <#' + targetChannelId + '>'
+      : '';
 
     await interaction.editReply({
       embeds: [
         buildSuccessEmbed(
-          'Webhook `' + res.data.id + '` registered on project `' + project.title + '`.\n' +
+          'Webhook `' + webhookId + '` registered on project `' + project.title + '`.\n' +
           'Vikunja will now POST the selected events to `' + targetUrl + '`.' +
           eventsSummary +
+          channelSummary +
           '\n\nTip: set `events:help` in this command to view format and common event meanings.' +
-          secretNote
+          '\nA webhook secret was generated and recorded locally for this webhook.'
         ),
       ],
     });
@@ -116,4 +159,33 @@ export async function autocomplete(interaction) {
   }
 
   await interaction.respond([]);
+}
+
+function buildWebhookTargetUrl() {
+  const baseUrl = config.bot.publicUrl;
+
+  let parsed;
+  try {
+    parsed = new URL(baseUrl);
+  } catch {
+    throw new Error('BOT_PUBLIC_URL must be a valid public URL like `https://your-bot.example.com`.');
+  }
+
+  if (!['http:', 'https:'].includes(parsed.protocol)) {
+    throw new Error('BOT_PUBLIC_URL must start with `http://` or `https://`.');
+  }
+
+  const basePath = parsed.pathname.replace(/\/+$/, '');
+  if (!basePath || basePath === '/') {
+    parsed.pathname = '/webhook';
+  } else if (basePath.endsWith('/webhook')) {
+    parsed.pathname = basePath;
+  } else {
+    parsed.pathname = basePath + '/webhook';
+  }
+
+  parsed.search = '';
+  parsed.hash = '';
+
+  return parsed.toString();
 }
