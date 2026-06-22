@@ -11,7 +11,7 @@ This page lists all currently available slash commands, with a short description
 | Slash command | Description | Example |
 | --- | --- | --- |
 | /project-list | List all Vikunja projects accessible to the configured API token. | /project-list |
-| /task-list | List tasks across all projects, or filter to a single project and optional title search. Use show-completed:false to hide done tasks. | /task-list project:Engineering search:api show-completed:false |
+| /task-list | List tasks across all projects, or filter to a single project and optional title search. Use show-completed:No to hide done tasks. | /task-list project:Engineering search:api show-completed:No |
 | /task-get | Show details for a specific task. | /task-get project:Engineering task:Fix webhook retry |
 | /task-create | Create a new task in a project. | /task-create project:Engineering title:Fix webhook retry due:2026-07-01 priority:3 |
 | /task-update | Update an existing task title, description, due date, and or priority. | /task-update project:Engineering task:Fix webhook retry title:Improve retry strategy priority:4 |

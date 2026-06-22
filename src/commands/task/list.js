@@ -8,6 +8,7 @@ import {
 import { getAllProjects, getAllTasks, getTasksByProject } from '../../services/vikunja.js';
 import { autocompleteProjects, resolveProjectSelection } from '../../services/vikunja-lookups.js';
 import { buildTaskListEmbed, buildErrorEmbed } from '../../utils/embeds.js';
+import { addShowCompletedOption, filterTasksByCompletion, parseShowCompletedOption } from '../../utils/task-visibility.js';
 
 const TASK_LIST_PAGE_SIZE = 10;
 const VIKUNJA_MAX_PER_PAGE = 50;
@@ -24,11 +25,9 @@ export const data = new SlashCommandBuilder()
   .addStringOption((opt) =>
     opt.setName('search')
       .setDescription('Search string to filter tasks by title')
-  )
-  .addBooleanOption((opt) =>
-    opt.setName('show-completed')
-      .setDescription('Include completed tasks in the results (default: true)')
   );
+
+addShowCompletedOption(data, 'Include completed tasks in the results (Yes/No, default: Yes)');
 
 /**
  * @param {import('discord.js').ChatInputCommandInteraction} interaction
@@ -38,7 +37,7 @@ export async function execute(interaction) {
 
   const projectSelection = interaction.options.getString('project');
   const search = interaction.options.getString('search') ?? undefined;
-  const includeCompleted = interaction.options.getBoolean('show-completed') ?? true;
+  const includeCompleted = parseShowCompletedOption(interaction.options.getString('show-completed'));
 
   try {
     let res;
@@ -111,22 +110,6 @@ export async function execute(interaction) {
     const msg = err.response?.data?.message ?? err.message;
     await interaction.editReply({ embeds: [buildErrorEmbed('Failed to list tasks: ' + msg)] });
   }
-}
-
-function filterTasksByCompletion(tasks, includeCompleted) {
-  if (includeCompleted) return tasks;
-  return tasks.filter((task) => !isTaskCompleted(task));
-}
-
-function isTaskCompleted(task) {
-  if (task?.done === true) return true;
-
-  const percentDone = Number(task?.percent_done ?? task?.percentDone);
-  if (Number.isFinite(percentDone) && percentDone >= 1) {
-    return true;
-  }
-
-  return false;
 }
 
 /**
