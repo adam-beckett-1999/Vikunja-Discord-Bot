@@ -160,8 +160,9 @@ async function getAllTasksAcrossProjects() {
       .map((project) => [Number(project.id), String(project?.title ?? '').trim()])
   );
 
-  const responses = await Promise.all(projects.map((project) => (
-    getTasksByProject(project.id, { page: 1, per_page: VIKUNJA_MAX_PER_PAGE }).catch((err) => {
+  const responses = [];
+  for (const project of projects) {
+    const response = await getTasksByProject(project.id, { page: 1, per_page: VIKUNJA_MAX_PER_PAGE }).catch((err) => {
       const status = Number(err?.response?.status);
       const message = String(err?.response?.data?.message ?? err?.message ?? 'unknown error');
       console.warn(
@@ -171,8 +172,10 @@ async function getAllTasksAcrossProjects() {
         + ' | reason=' + message
       );
       return { data: [] };
-    })
-  )));
+    });
+
+    responses.push(response);
+  }
 
   const deduped = new Map();
   for (const response of responses) {

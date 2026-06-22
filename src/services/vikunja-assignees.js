@@ -7,7 +7,7 @@ import {
 
 const CACHE_TTL_MS = 60_000;
 const MAX_PAGES = 10;
-const PER_PAGE = 100;
+const PER_PAGE = 50;
 
 let assigneeCache = {
   expiresAt: 0,

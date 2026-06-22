@@ -165,6 +165,9 @@ export async function removeTaskReminder(taskId, reminderInstant) {
  */
 export async function addAssigneeToTask(taskId, userId) {
   const id = Number(userId);
+  if (!Number.isFinite(id)) {
+    throw new Error('A valid user ID is required to add an assignee.');
+  }
 
   return requestFirstMutationSuccess([
     () => vikunjaClient.put('/tasks/' + taskId + '/assignees', { id }),
@@ -184,6 +187,9 @@ export async function addAssigneeToTask(taskId, userId) {
  */
 export async function removeAssigneeFromTask(taskId, userId) {
   const id = Number(userId);
+  if (!Number.isFinite(id)) {
+    throw new Error('A valid user ID is required to remove an assignee.');
+  }
 
   return requestFirstMutationSuccess([
     () => vikunjaClient.delete('/tasks/' + taskId + '/assignees/' + id),
