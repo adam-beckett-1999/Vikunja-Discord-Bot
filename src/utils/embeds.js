@@ -13,15 +13,6 @@ import { formatTaskRemindersForEmbed } from './task-reminders.js';
 const MAX_EMBED_DESCRIPTION_LENGTH = 4096;
 const TASK_LIST_MAX_ROWS = 20;
 
-const TASK_LIST_PRIORITY_SHORT = {
-  0: 'USET',
-  1: 'LOW',
-  2: 'MED',
-  3: 'HIGH',
-  4: 'URGT',
-  5: 'NOW',
-};
-
 /** Priority label map matching Vikunja's values (0–5). */
 const PRIORITY_LABELS = {
   0: 'Unset',
@@ -339,52 +330,41 @@ export function buildTaskListEmbed(tasks, title) {
   const pendingCount = tasks.length - doneCount;
   const overdueCount = tasks.filter((task) => isTaskOverdue(task, now)).length;
 
-  const header = [
-    padCell('ID', 5),
-    padCell('ST', 4),
-    padCell('PR', 4),
-    padCell('DUE', 10),
-    padCell('PROJECT', 14),
-    'TITLE',
-  ].join(' ');
+  const projectNames = new Set(tasks.map((task) => getTaskProjectLabel(task)).filter(Boolean));
+  const hasMultipleProjects = projectNames.size > 1;
 
-  const divider = [
-    '-'.repeat(5),
-    '-'.repeat(4),
-    '-'.repeat(4),
-    '-'.repeat(10),
-    '-'.repeat(14),
-    '-'.repeat(40),
-  ].join(' ');
+  const entries = [];
+  for (const task of tasks.slice(0, TASK_LIST_MAX_ROWS)) {
+    const icon = getTaskStatusIcon(task, now);
+    const id = task?.id ?? '?';
+    const titleText = truncateCell(
+      String(task?.title ?? 'Untitled').replace(/\s+/g, ' ').trim(),
+      88
+    );
 
-  const allRows = tasks.map((task) => {
-    const projectCell = String(task?.project?.title ?? task?.project_title ?? task?.project_id ?? '-')
-      .replace(/\s+/g, ' ')
-      .trim();
+    const parts = [
+      'Status: ' + getTaskListStatus(task, now),
+      'Priority: ' + formatTaskListPriority(task),
+      'Due: ' + formatTaskListDueDate(task),
+    ];
 
-    const titleCell = String(task?.title ?? 'Untitled')
-      .replace(/\s+/g, ' ')
-      .trim();
+    if (hasMultipleProjects) {
+      parts.push('Project: ' + truncateCell(getTaskProjectLabel(task), 28));
+    }
 
-    return [
-      padCell(String(task?.id ?? '?'), 5),
-      padCell(getTaskListStatus(task, now), 4),
-      padCell(TASK_LIST_PRIORITY_SHORT[Number(task?.priority ?? 0)] ?? 'UNK', 4),
-      padCell(formatTaskListDueDate(task), 10),
-      padCell(truncateCell(projectCell, 14), 14),
-      truncateCell(titleCell, 40),
-    ].join(' ');
-  });
-
-  const rows = [header, divider, ...allRows.slice(0, TASK_LIST_MAX_ROWS)];
-  let table = '```text\n' + rows.join('\n') + '\n```';
-
-  while (table.length > 3900 && rows.length > 3) {
-    rows.pop();
-    table = '```text\n' + rows.join('\n') + '\n```';
+    entries.push(
+      icon + ' **' + titleText + '** `#' + id + '`\n'
+      + parts.map((part) => '`' + part + '`').join(' • ')
+    );
   }
 
-  embed.setDescription(table);
+  let description = entries.join('\n\n');
+  while (description.length > 3900 && entries.length > 1) {
+    entries.pop();
+    description = entries.join('\n\n');
+  }
+
+  embed.setDescription(description);
   embed.addFields({
     name: 'Summary',
     value: [
@@ -395,17 +375,11 @@ export function buildTaskListEmbed(tasks, title) {
     ].join(' | '),
   });
 
-  if (tasks.length > (rows.length - 2)) {
-    embed.setFooter({ text: 'Showing ' + (rows.length - 2) + ' of ' + tasks.length + ' tasks.' });
+  if (tasks.length > entries.length) {
+    embed.setFooter({ text: 'Showing ' + entries.length + ' of ' + tasks.length + ' tasks.' });
   }
 
   return embed;
-}
-
-function padCell(value, width) {
-  const text = String(value ?? '');
-  if (text.length >= width) return text;
-  return text + ' '.repeat(width - text.length);
 }
 
 function truncateCell(value, width) {
@@ -415,10 +389,21 @@ function truncateCell(value, width) {
   return text.slice(0, width - 1) + '.';
 }
 
+function getTaskStatusIcon(task, now) {
+  if (task?.done) return '✅';
+  if (isTaskOverdue(task, now)) return '⚠️';
+  return '🔲';
+}
+
 function getTaskListStatus(task, now) {
   if (task?.done) return 'DONE';
   if (isTaskOverdue(task, now)) return 'LATE';
   return 'TODO';
+}
+
+function formatTaskListPriority(task) {
+  const priority = Number(task?.priority ?? 0);
+  return PRIORITY_LABELS[priority] ?? 'Unknown';
 }
 
 function isTaskOverdue(task, now) {
@@ -442,6 +427,10 @@ function formatTaskListDueDate(task) {
   if (!due.isValid) return '-';
 
   return due.setZone(config.bot.timeZone).toFormat('yyyy-MM-dd');
+}
+
+function getTaskProjectLabel(task) {
+  return String(task?.project?.title ?? task?.project_title ?? task?.project_id ?? '-').replace(/\s+/g, ' ').trim();
 }
 
 /**

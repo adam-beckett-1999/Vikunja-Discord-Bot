@@ -1,5 +1,5 @@
 import { SlashCommandBuilder } from 'discord.js';
-import { getAllTasks, getTasksByProject } from '../../services/vikunja.js';
+import { getAllProjects, getAllTasks, getTasksByProject } from '../../services/vikunja.js';
 import { autocompleteProjects, resolveProjectSelection } from '../../services/vikunja-lookups.js';
 import { buildTaskListEmbed, buildErrorEmbed } from '../../utils/embeds.js';
 
@@ -50,13 +50,25 @@ export async function execute(interaction) {
       title = 'Tasks in ' + project.title;
     } else {
       res = await getAllTasks(params).catch(async (err) => {
-        if (!shouldRetryWithoutServerSearch(err, search)) throw err;
+        if (!search) throw err;
+
+        if (!shouldRetryWithoutServerSearch(err, search)) {
+          logTaskListSearchAllProjectsFallback(search, err);
+          return {
+            data: await getAllTasksAcrossProjects(),
+          };
+        }
 
         logTaskListSearchFallback('all', search, err);
         const fallbackParams = { page: 1 };
-        return getAllTasks(fallbackParams);
+        return getAllTasks(fallbackParams).catch(async (fallbackErr) => {
+          logTaskListSearchAllProjectsFallback(search, fallbackErr);
+          return {
+            data: await getAllTasksAcrossProjects(),
+          };
+        });
       });
-      title = 'All Tasks';
+      title = search ? 'Tasks containing "' + search + '"' : 'All Tasks';
     }
 
     let tasks = Array.isArray(res.data) ? res.data : [];
@@ -96,6 +108,48 @@ function logTaskListSearchFallback(scope, search, err) {
     + ' | status=' + (Number.isFinite(status) ? String(status) : 'n/a')
     + ' | reason=' + message
   );
+}
+
+function logTaskListSearchAllProjectsFallback(search, err) {
+  const status = Number(err?.response?.status);
+  const message = String(err?.response?.data?.message ?? err?.message ?? 'unknown error');
+  console.warn(
+    '[task-list] Falling back to all-project aggregation'
+    + ' | query="' + String(search ?? '') + '"'
+    + ' | status=' + (Number.isFinite(status) ? String(status) : 'n/a')
+    + ' | reason=' + message
+  );
+}
+
+async function getAllTasksAcrossProjects() {
+  const projectsResponse = await getAllProjects();
+  const projects = Array.isArray(projectsResponse?.data) ? projectsResponse.data : [];
+
+  const responses = await Promise.all(projects.map((project) => (
+    getTasksByProject(project.id, { page: 1 }).catch((err) => {
+      const status = Number(err?.response?.status);
+      const message = String(err?.response?.data?.message ?? err?.message ?? 'unknown error');
+      console.warn(
+        '[task-list] Project task fetch failed during aggregation'
+        + ' | projectId=' + project.id
+        + ' | status=' + (Number.isFinite(status) ? String(status) : 'n/a')
+        + ' | reason=' + message
+      );
+      return { data: [] };
+    })
+  )));
+
+  const deduped = new Map();
+  for (const response of responses) {
+    const tasks = Array.isArray(response?.data) ? response.data : [];
+    for (const task of tasks) {
+      const id = Number(task?.id);
+      if (!Number.isFinite(id)) continue;
+      deduped.set(id, task);
+    }
+  }
+
+  return [...deduped.values()];
 }
 
 export async function autocomplete(interaction) {
