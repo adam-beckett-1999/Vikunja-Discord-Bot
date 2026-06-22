@@ -114,6 +114,15 @@ async function fetchAllPages(fetchPage) {
     const tasks = Array.isArray(response?.data) ? response.data : [];
     collected.push(...tasks);
     if (tasks.length < VIKUNJA_MAX_PER_PAGE) break;
+
+    if (page === VIKUNJA_MAX_FETCH_PAGES) {
+      console.warn(
+        '[task-list] Reached fetch page limit'
+        + ' | maxPages=' + VIKUNJA_MAX_FETCH_PAGES
+        + ' | perPage=' + VIKUNJA_MAX_PER_PAGE
+        + ' | note=results may be truncated'
+      );
+    }
   }
 
   return { data: collected };
