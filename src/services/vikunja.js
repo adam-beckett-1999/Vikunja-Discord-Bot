@@ -352,15 +352,16 @@ export const removeTagFromTask = removeLabelFromTask;
  * @param {number} projectId
  * @param {string} targetUrl  - Publicly reachable URL of this bot's webhook endpoint
  * @param {string[]} [events] - Defaults to all task events
+ * @param {string} [secret]   - Webhook signature secret
  */
-export async function createWebhook(projectId, targetUrl, events) {
+export async function createWebhook(projectId, targetUrl, events, secret) {
   const payload = {
     target_url: targetUrl,
     events: events ?? DEFAULT_WEBHOOK_EVENTS,
   };
 
-  if (config.webhook.secret) {
-    payload.secret = config.webhook.secret;
+  if (secret) {
+    payload.secret = secret;
   }
 
   return vikunjaClient.put('/projects/' + projectId + '/webhooks', payload);

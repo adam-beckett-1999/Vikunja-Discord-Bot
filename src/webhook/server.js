@@ -15,6 +15,7 @@ import {
   getCachedTaskSnapshot,
 } from '../services/task-update-context.js';
 import { cacheProject, getCachedProjectTitle } from '../services/project-cache.js';
+import { listWebhookRecords } from '../services/webhook-records.js';
 import { getTaskUpdateHighlightFromTasks } from '../utils/task-update-highlight.js';
 import { getTaskUpdateHighlightFromPayload } from '../utils/task-update-highlight.js';
 import { getMappedDiscordUserIdsForTask } from '../services/assignee-links.js';
@@ -55,27 +56,35 @@ export function getWebhookEventType(payload) {
  * legitimate.  Vikunja signs the raw body with the webhook secret and places
  * the hex digest in the `X-Vikunja-Signature` header.
  *
- * If no secret is configured the check is skipped (useful during development).
- *
  * @param {string} rawBody
  * @param {string|undefined} signature
+ * @param {string[]} secrets
  * @returns {boolean}
  */
-function isSignatureValid(rawBody, signature) {
-  if (!config.webhook.secret) return true; // No secret configured – skip check.
+function isSignatureValid(rawBody, signature, secrets) {
   if (!signature) return false;
-  const expected = crypto
-    .createHmac('sha256', config.webhook.secret)
-    .update(rawBody, 'utf8')
-    .digest('hex');
   // Strip optional "sha256=" prefix and validate that only hex characters remain.
   const receivedHex = signature.replace(/^sha256=/, '');
   if (!/^[0-9a-f]+$/i.test(receivedHex)) return false;
-  // Use timingSafeEqual to prevent timing attacks.
-  const expectedBuf = Buffer.from(expected, 'hex');
-  const receivedBuf = Buffer.from(receivedHex, 'hex');
-  if (expectedBuf.length !== receivedBuf.length) return false;
-  return crypto.timingSafeEqual(expectedBuf, receivedBuf);
+
+  for (const secret of secrets) {
+    const normalizedSecret = String(secret ?? '').trim();
+    if (!normalizedSecret) continue;
+
+    const expected = crypto
+      .createHmac('sha256', normalizedSecret)
+      .update(rawBody, 'utf8')
+      .digest('hex');
+
+    const expectedBuf = Buffer.from(expected, 'hex');
+    const receivedBuf = Buffer.from(receivedHex, 'hex');
+    if (expectedBuf.length !== receivedBuf.length) continue;
+    if (crypto.timingSafeEqual(expectedBuf, receivedBuf)) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 /**
@@ -107,17 +116,23 @@ export function startWebhookServer(discordClient) {
 
     logWebhook('info', 'Incoming webhook request | contentType=' + contentType + ' | contentLength=' + contentLength + ' | signature=' + (signature ? 'present' : 'missing'));
 
-    if (!isSignatureValid(rawBody, signature)) {
-      logWebhook('warn', 'Rejected request: invalid signature | secretConfigured=' + Boolean(config.webhook.secret) + ' | signaturePresent=' + Boolean(signature));
-      return res.status(401).json({ error: 'Invalid signature' });
-    }
-
     let payload;
     try {
       payload = JSON.parse(rawBody);
     } catch {
       logWebhook('warn', 'Rejected request: invalid JSON body');
       return res.status(400).json({ error: 'Invalid JSON' });
+    }
+
+    const webhookRecords = await listWebhookRecords().catch(() => []);
+    if (!webhookRecords.length) {
+      logWebhook('warn', 'Rejected request: no webhook records available for signature verification');
+      return res.status(401).json({ error: 'Invalid signature' });
+    }
+
+    if (!isSignatureValid(rawBody, signature, webhookRecords.map((record) => record.secret))) {
+      logWebhook('warn', 'Rejected request: invalid signature | recordsAvailable=' + webhookRecords.length + ' | signaturePresent=' + Boolean(signature));
+      return res.status(401).json({ error: 'Invalid signature' });
     }
 
     const eventType = getWebhookEventType(payload);

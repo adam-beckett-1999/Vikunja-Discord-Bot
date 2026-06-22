@@ -1,8 +1,8 @@
 import { ChannelType, SlashCommandBuilder } from 'discord.js';
 import { createWebhook } from '../../services/vikunja.js';
-import config from '../../config.js';
 import { autocompleteProjects, resolveProjectSelection } from '../../services/vikunja-lookups.js';
 import { setProjectChannelLink } from '../../services/project-channel-links.js';
+import { generateWebhookSecret, upsertWebhookRecord } from '../../services/webhook-records.js';
 import {
   formatWebhookEventsHelp,
   parseWebhookEventsInput,
@@ -103,12 +103,17 @@ export async function execute(interaction) {
   }
 
   try {
-    const res = await createWebhook(project.id, targetUrl, events);
+    const secret = generateWebhookSecret();
+    const res = await createWebhook(project.id, targetUrl, events, secret);
     await setProjectChannelLink(project.id, targetChannelId);
+    await upsertWebhookRecord({
+      projectId: project.id,
+      webhookId: res.data.id,
+      targetUrl,
+      secret,
+      events,
+    });
 
-    const secretNote = config.webhook.secret
-      ? '\nUsing configured webhook secret for signature verification.'
-      : '';
     const eventsSummary = '\nEvents: `' + events.join('`, `') + '`';
     const channelSummary = targetChannelId
       ? '\nDiscord channel: <#' + targetChannelId + '>'
@@ -126,7 +131,7 @@ export async function execute(interaction) {
           channelSummary +
           urlAdjustSummary +
           '\n\nTip: set `events:help` in this command to view format and common event meanings.' +
-          secretNote
+          '\nA webhook secret was generated and recorded locally for this webhook.'
         ),
       ],
     });

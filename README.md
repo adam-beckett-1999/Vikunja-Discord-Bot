@@ -15,7 +15,7 @@ Self-hosted Discord bot for Vikunja.
 - Vikunja sends events to the bot webhook endpoint.
 - The bot posts those events to the mapped Discord channel for the matching project.
 - Task embeds include an `Open` link button for the relevant Vikunja page.
-- If `WEBHOOK_SECRET` is set, the bot verifies incoming webhook signatures.
+- The bot verifies incoming webhook signatures using per-webhook secrets stored in `/data`.
 
 ## What you need
 
@@ -57,7 +57,6 @@ Set these in `.env` in the same folder as your compose file, or ensure you inclu
 | `VIKUNJA_BASE_URL` | Yes | Vikunja base URL |
 | `VIKUNJA_API_TOKEN` | Yes | Vikunja API token |
 | `WEBHOOK_PORT` | No | Webhook port (default `3000`) |
-| `WEBHOOK_SECRET` | No | Webhook signature secret |
 
 ### Deploy the service
 
@@ -142,7 +141,7 @@ task.created, task.updated, task.comment.created
 | `project.shared.team` | A project was shared with a team |
 | `project.shared.user` | A project was shared with a user |
 
-If `WEBHOOK_SECRET` is set, `/webhook-register` will include that same secret when creating the webhook so incoming deliveries can pass signature verification.
+`/webhook-register` generates a webhook secret automatically, sends it to Vikunja, and records it locally in `/data/webhook-records.json` so incoming deliveries can be verified later.
 
 You can use the following commands to list and update which projects/webhooks post to which channels:
 
@@ -209,7 +208,7 @@ Use dedicated commands to change task completion status:
 
 ## Webhook Security
 
-When `WEBHOOK_SECRET` is set, the bot verifies the `X-Vikunja-Signature` HMAC-SHA256 header on every incoming webhook request. If you're manually creating the webhooks within Vikunja, set the same value when creating the webhook to ensure only legitimate requests are processed.
+When you register a webhook through `/webhook-register`, the bot generates a secret, stores it in `/data/webhook-records.json`, and uses that record to verify the `X-Vikunja-Signature` HMAC-SHA256 header on incoming webhook requests.
 
 ---
 
