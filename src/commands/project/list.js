@@ -10,7 +10,7 @@ export const data = new SlashCommandBuilder()
  * @param {import('discord.js').ChatInputCommandInteraction} interaction
  */
 export async function execute(interaction) {
-  await interaction.deferReply();
+  await interaction.deferReply({ ephemeral: true });
 
   try {
     const res = await getAllProjects();

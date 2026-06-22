@@ -13,8 +13,8 @@ import {
   resolveProjectSelection,
   resolveTaskSelection,
 } from '../../services/vikunja-lookups.js';
-import { cacheTaskSnapshot, markManualTaskUpdate } from '../../services/task-update-context.js';
-import { buildErrorEmbed, buildTaskEmbed, buildTaskOpenLinkComponents } from '../../utils/embeds.js';
+import { cacheTaskSnapshot } from '../../services/task-update-context.js';
+import { buildErrorEmbed, buildTaskEmbed } from '../../utils/embeds.js';
 import { extractTaskReminderInstants, formatReminderInstantForDisplay } from '../../utils/task-reminders.js';
 import { getTaskUpdateHighlightFromTasks } from '../../utils/task-update-highlight.js';
 
@@ -88,7 +88,7 @@ export const data = new SlashCommandBuilder()
  * @param {import('discord.js').ChatInputCommandInteraction} interaction
  */
 export async function execute(interaction) {
-  await interaction.deferReply();
+  await interaction.deferReply({ ephemeral: true });
 
   const action = interaction.options.getSubcommand(true);
   const projectSelection = interaction.options.getString('project', true);
@@ -132,7 +132,6 @@ export async function execute(interaction) {
 
       await interaction.editReply({
         embeds: [embed],
-        components: buildTaskOpenLinkComponents(currentTask),
       });
       return;
     }
@@ -149,7 +148,6 @@ export async function execute(interaction) {
       }
 
       const beforeTask = (await getTask(task.id)).data;
-        markManualTaskUpdate(task.id, 8);
       await addTaskReminder(task.id, reminderInstant);
       const updatedTask = (await getTask(task.id)).data;
       cacheTaskSnapshot(updatedTask);
@@ -157,7 +155,6 @@ export async function execute(interaction) {
 
       await interaction.editReply({
         embeds: [buildTaskEmbed(updatedTask, 'Updated', project.title, updateHighlight)],
-        components: buildTaskOpenLinkComponents(updatedTask),
       });
       return;
     }
@@ -175,7 +172,6 @@ export async function execute(interaction) {
         return;
       }
 
-      markManualTaskUpdate(task.id, 8);
       await removeTaskReminder(task.id, reminderInstant);
       const updatedTask = (await getTask(task.id)).data;
       cacheTaskSnapshot(updatedTask);
@@ -183,7 +179,6 @@ export async function execute(interaction) {
 
       await interaction.editReply({
         embeds: [buildTaskEmbed(updatedTask, 'Updated', project.title, updateHighlight)],
-        components: buildTaskOpenLinkComponents(updatedTask),
       });
       return;
     }

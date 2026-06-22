@@ -20,7 +20,7 @@ export const data = new SlashCommandBuilder()
  * @param {import('discord.js').ChatInputCommandInteraction} interaction
  */
 export async function execute(interaction) {
-  await interaction.deferReply();
+  await interaction.deferReply({ ephemeral: true });
 
   const projectSelection = interaction.options.getString('project');
   const search = interaction.options.getString('search') ?? undefined;

@@ -7,9 +7,9 @@ import {
   resolveProjectSelection,
   resolveTaskSelection,
 } from '../../services/vikunja-lookups.js';
-import { cacheTaskSnapshot, markManualTaskUpdate } from '../../services/task-update-context.js';
+import { cacheTaskSnapshot } from '../../services/task-update-context.js';
 import { getTaskUpdateHighlightFromTasks } from '../../utils/task-update-highlight.js';
-import { buildTaskEmbed, buildErrorEmbed, buildTaskOpenLinkComponents } from '../../utils/embeds.js';
+import { buildTaskEmbed, buildErrorEmbed } from '../../utils/embeds.js';
 
 export const data = new SlashCommandBuilder()
   .setName('task-pending')
@@ -28,7 +28,7 @@ export const data = new SlashCommandBuilder()
   );
 
 export async function execute(interaction) {
-  await interaction.deferReply();
+  await interaction.deferReply({ ephemeral: true });
 
   const projectSelection = interaction.options.getString('project', true);
   const taskSelection = interaction.options.getString('task', true);
@@ -56,7 +56,6 @@ export async function execute(interaction) {
   }
 
   try {
-    markManualTaskUpdate(task.id);
     const res = await updateTask(task.id, { done: false });
     const updatedTask = await getTask(task.id)
       .then((response) => response.data)
@@ -66,7 +65,6 @@ export async function execute(interaction) {
     const updateHighlight = getTaskUpdateHighlightFromTasks(task, updatedTask);
     await interaction.editReply({
       embeds: [buildTaskEmbed(updatedTask, 'Updated', project.title, updateHighlight)],
-      components: buildTaskOpenLinkComponents(updatedTask),
     });
   } catch (err) {
     const msg = err.response?.data?.message ?? err.message;

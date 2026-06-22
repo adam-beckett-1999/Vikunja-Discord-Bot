@@ -336,7 +336,6 @@ export function buildTaskListEmbed(tasks, title) {
   const entries = [];
   for (const task of tasks.slice(0, TASK_LIST_MAX_ROWS)) {
     const icon = getTaskStatusIcon(task, now);
-    const id = task?.id ?? '?';
     const titleText = truncateCell(
       String(task?.title ?? 'Untitled').replace(/\s+/g, ' ').trim(),
       88
@@ -353,7 +352,7 @@ export function buildTaskListEmbed(tasks, title) {
     }
 
     entries.push(
-      icon + ' **' + titleText + '** `#' + id + '`\n'
+      icon + ' **' + titleText + '**\n'
       + parts.map((part) => '`' + part + '`').join(' • ')
     );
   }

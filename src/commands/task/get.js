@@ -7,7 +7,7 @@ import {
   resolveProjectSelection,
   resolveTaskSelection,
 } from '../../services/vikunja-lookups.js';
-import { buildTaskEmbed, buildErrorEmbed, buildTaskOpenLinkComponents } from '../../utils/embeds.js';
+import { buildTaskEmbed, buildErrorEmbed } from '../../utils/embeds.js';
 
 export const data = new SlashCommandBuilder()
   .setName('task-get')
@@ -29,7 +29,7 @@ export const data = new SlashCommandBuilder()
  * @param {import('discord.js').ChatInputCommandInteraction} interaction
  */
 export async function execute(interaction) {
-  await interaction.deferReply();
+  await interaction.deferReply({ ephemeral: true });
 
   const projectSelection = interaction.options.getString('project', true);
   const taskSelection = interaction.options.getString('task', true);
@@ -54,7 +54,6 @@ export async function execute(interaction) {
     const res = await getTask(task.id);
     await interaction.editReply({
       embeds: [buildTaskEmbed(res.data, undefined, project.title)],
-      components: buildTaskOpenLinkComponents(res.data),
     });
   } catch (err) {
     const msg = err.response?.data?.message ?? err.message;

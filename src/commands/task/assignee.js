@@ -15,8 +15,8 @@ import {
   autocompleteKnownAssignees,
   resolveKnownAssigneeSelection,
 } from '../../services/vikunja-assignees.js';
-import { cacheTaskSnapshot, markManualTaskUpdate } from '../../services/task-update-context.js';
-import { buildErrorEmbed, buildTaskEmbed, buildTaskOpenLinkComponents } from '../../utils/embeds.js';
+import { cacheTaskSnapshot } from '../../services/task-update-context.js';
+import { buildErrorEmbed, buildTaskEmbed } from '../../utils/embeds.js';
 import { getTaskUpdateHighlightFromTasks } from '../../utils/task-update-highlight.js';
 
 export const data = new SlashCommandBuilder()
@@ -67,7 +67,7 @@ function parseAssigneeList(value) {
  * @param {import('discord.js').ChatInputCommandInteraction} interaction
  */
 export async function execute(interaction) {
-  await interaction.deferReply();
+  await interaction.deferReply({ ephemeral: true });
 
   const projectSelection = interaction.options.getString('project', true);
   const taskSelection = interaction.options.getString('task', true);
@@ -109,7 +109,6 @@ export async function execute(interaction) {
       cacheTaskSnapshot(currentTask);
       await interaction.editReply({
         embeds: [buildTaskEmbed(currentTask, 'Assignees', project.title)],
-        components: buildTaskOpenLinkComponents(currentTask),
       });
       return;
     }
@@ -161,11 +160,6 @@ export async function execute(interaction) {
       return;
     }
 
-    const expectedWebhookUpdates = addIds.length + removeIds.length;
-    if (expectedWebhookUpdates > 0) {
-      markManualTaskUpdate(task.id, expectedWebhookUpdates);
-    }
-
     for (const assigneeId of addIds) {
       await addAssigneeToTask(task.id, assigneeId);
     }
@@ -180,7 +174,6 @@ export async function execute(interaction) {
     const updateHighlight = getTaskUpdateHighlightFromTasks(currentTask, updatedTask);
     await interaction.editReply({
       embeds: [buildTaskEmbed(updatedTask, 'Updated', project.title, updateHighlight)],
-      components: buildTaskOpenLinkComponents(updatedTask),
     });
   } catch (err) {
     const msg = err.response?.data?.message ?? err.message;

@@ -1,7 +1,7 @@
 import { SlashCommandBuilder } from 'discord.js';
 import { createTask } from '../../services/vikunja.js';
 import { autocompleteProjects, resolveProjectSelection } from '../../services/vikunja-lookups.js';
-import { buildTaskEmbed, buildErrorEmbed, buildTaskOpenLinkComponents } from '../../utils/embeds.js';
+import { buildTaskEmbed, buildErrorEmbed } from '../../utils/embeds.js';
 
 export const data = new SlashCommandBuilder()
   .setName('task-create')
@@ -36,7 +36,7 @@ export const data = new SlashCommandBuilder()
  * @param {import('discord.js').ChatInputCommandInteraction} interaction
  */
 export async function execute(interaction) {
-  await interaction.deferReply();
+  await interaction.deferReply({ ephemeral: true });
 
   const projectSelection = interaction.options.getString('project', true);
   const project = await resolveProjectSelection(projectSelection);
@@ -69,7 +69,6 @@ export async function execute(interaction) {
     const res = await createTask(project.id, taskData);
     await interaction.editReply({
       embeds: [buildTaskEmbed(res.data, 'Created', project.title)],
-      components: buildTaskOpenLinkComponents(res.data),
     });
   } catch (err) {
     const msg = err.response?.data?.message ?? err.message;

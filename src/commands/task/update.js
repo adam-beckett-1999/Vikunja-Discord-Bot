@@ -7,9 +7,9 @@ import {
   resolveProjectSelection,
   resolveTaskSelection,
 } from '../../services/vikunja-lookups.js';
-import { cacheTaskSnapshot, markManualTaskUpdate } from '../../services/task-update-context.js';
+import { cacheTaskSnapshot } from '../../services/task-update-context.js';
 import { getTaskUpdateHighlightFromTasks } from '../../utils/task-update-highlight.js';
-import { buildTaskEmbed, buildErrorEmbed, buildTaskOpenLinkComponents } from '../../utils/embeds.js';
+import { buildTaskEmbed, buildErrorEmbed } from '../../utils/embeds.js';
 
 const PRIORITY_CHOICES = [
   { name: 'Unset', value: '0' },
@@ -57,7 +57,7 @@ export const data = new SlashCommandBuilder()
  * @param {import('discord.js').ChatInputCommandInteraction} interaction
  */
 export async function execute(interaction) {
-  await interaction.deferReply();
+  await interaction.deferReply({ ephemeral: true });
 
   const projectSelection = interaction.options.getString('project', true);
   const taskSelection = interaction.options.getString('task', true);
@@ -119,12 +119,10 @@ export async function execute(interaction) {
       .then((response) => response.data)
       .catch(() => res.data);
 
-    markManualTaskUpdate(task.id);
     cacheTaskSnapshot(updatedTask);
     const updateHighlight = getTaskUpdateHighlightFromTasks(task, updatedTask);
     await interaction.editReply({
       embeds: [buildTaskEmbed(updatedTask, 'Updated', project.title, updateHighlight)],
-      components: buildTaskOpenLinkComponents(updatedTask),
     });
   } catch (err) {
     const msg = err.response?.data?.message ?? err.message;

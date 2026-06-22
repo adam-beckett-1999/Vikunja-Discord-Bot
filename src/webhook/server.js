@@ -12,7 +12,6 @@ import {
   cacheTaskSnapshot,
   clearTaskSnapshot,
   getCachedTaskSnapshot,
-  shouldSuppressWebhookUpdate,
 } from '../services/task-update-context.js';
 import { cacheProject, getCachedProjectTitle } from '../services/project-cache.js';
 import { getTaskUpdateHighlightFromTasks } from '../utils/task-update-highlight.js';
@@ -165,14 +164,6 @@ async function postNotification(discordClient, eventType, payload) {
   const channel = await discordClient.channels.fetch(channelId).catch(() => null);
   if (!channel || !channel.isTextBased()) {
     logWebhook('error', 'Notification channel not found or not text-based: ' + channelId);
-    return;
-  }
-
-  const updateTaskId = task?.id ?? getTaskIdFromPayload(payload, task);
-  if (eventType === 'task.updated' && updateTaskId !== null && shouldSuppressWebhookUpdate(updateTaskId)) {
-    if (task) {
-      cacheTaskSnapshot(task);
-    }
     return;
   }
 
