@@ -22,7 +22,7 @@
 ## What you need
 
 - A Discord bot and application token
-- A Vikunja instance with an API token
+- A [Vikunja](https://vikunja.io/) instance with an API token
 - A publicly reachable URL for the bot webhook endpoint
 - Docker and Docker Compose
 
