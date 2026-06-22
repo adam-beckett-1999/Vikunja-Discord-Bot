@@ -4,7 +4,7 @@
 
 # Command Reference
 
-This file lists all currently available slash commands, with a short description and usage example.
+This page lists all currently available slash commands, with a short description and usage example.
 
 ## Commands
 
@@ -20,7 +20,7 @@ This file lists all currently available slash commands, with a short description
 | /task-pending | Mark a task as pending. | /task-pending project:Engineering task:Fix webhook retry |
 | /task-labels | Add and or remove one or more labels on a task using comma-separated label names. | /task-labels project:Engineering task:Fix webhook retry add:backend,urgent remove:blocked |
 | /task-assignee | List, add, and or remove assignees on a task. Add and remove accept comma-separated values such as username or id:123. | /task-assignee project:Engineering task:Fix webhook retry add:alice,id:42 remove:bob |
-| /task-reminder add | Add a reminder to a task using YYYY-MM-DD HH:mm in the bot timezone. | /task-reminder add project:Engineering task:Fix webhook retry at:2026-06-21 18:00 |
+| /task-reminder add | Add a reminder to a task using YYYY-MM-DD HH:mm. | /task-reminder add project:Engineering task:Fix webhook retry at:2026-06-21 18:00 |
 | /task-reminder list | List reminders on a task. | /task-reminder list project:Engineering task:Fix webhook retry |
 | /task-reminder remove | Remove a reminder from a task (reminder option supports autocomplete). | /task-reminder remove project:Engineering task:Fix webhook retry reminder:2026-06-21 18:00 |
 | /webhook-register | Register a Vikunja webhook for a project, with optional event filter and channel mapping. | /webhook-register project:Engineering events:task.created,task.updated channel:#vikunja-updates |
@@ -37,3 +37,4 @@ This file lists all currently available slash commands, with a short description
 - The /task-reminder add at value must use 24-hour format: YYYY-MM-DD HH:mm.
 - The /task-labels add and remove options are comma-separated lists.
 - The /task-assignee add and remove options are comma-separated lists and support mixed forms such as username and id:123.
+- In order for task assignees to be notified in discord correctly, an alert-assignee must be configured for that used using /alert-assignee link
