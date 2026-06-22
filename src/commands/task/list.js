@@ -58,7 +58,12 @@ export async function execute(interaction) {
       title = 'Tasks in ' + project.title;
     } else {
       res = await getAllTasks(params).catch(async (err) => {
-        if (!search) throw err;
+        if (!search) {
+          logTaskListAllProjectsFallback(err);
+          return {
+            data: await getAllTasksAcrossProjects(),
+          };
+        }
 
         if (!shouldRetryWithoutServerSearch(err, search)) {
           logTaskListSearchAllProjectsFallback(search, err);
@@ -129,6 +134,17 @@ function logTaskListSearchAllProjectsFallback(search, err) {
   console.warn(
     '[task-list] Falling back to all-project aggregation'
     + ' | query="' + String(search ?? '') + '"'
+    + ' | status=' + (Number.isFinite(status) ? String(status) : 'n/a')
+    + ' | reason=' + message
+  );
+}
+
+function logTaskListAllProjectsFallback(err) {
+  const status = Number(err?.response?.status);
+  const message = String(err?.response?.data?.message ?? err?.message ?? 'unknown error');
+  console.warn(
+    '[task-list] Falling back to all-project aggregation'
+    + ' | query=""'
     + ' | status=' + (Number.isFinite(status) ? String(status) : 'n/a')
     + ' | reason=' + message
   );
