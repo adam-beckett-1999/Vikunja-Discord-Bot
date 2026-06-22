@@ -266,17 +266,17 @@ function findNextNonBlankIndex(lines, startIndex) {
 
 function collapseChecklistSpacing(lines) {
   const collapsed = [];
+  let lastNonBlankWasChecklist = false;
 
   for (let index = 0; index < lines.length; index += 1) {
     const current = lines[index];
 
     const isBlank = String(current ?? '').trim() === '';
     if (isBlank) {
-      const previous = index > 0 ? lines[index - 1] : '';
       const nextNonBlankIndex = findNextNonBlankIndex(lines, index + 1);
       const nextNonBlank = nextNonBlankIndex >= 0 ? lines[nextNonBlankIndex] : '';
 
-      if (isRenderedChecklistLine(previous) && isRenderedChecklistLine(nextNonBlank)) {
+      if (lastNonBlankWasChecklist && isRenderedChecklistLine(nextNonBlank)) {
         continue;
       }
     }
@@ -286,6 +286,10 @@ function collapseChecklistSpacing(lines) {
     }
 
     collapsed.push(current);
+
+    if (!isBlank) {
+      lastNonBlankWasChecklist = isRenderedChecklistLine(current);
+    }
   }
 
   return collapsed;
