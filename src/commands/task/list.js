@@ -124,6 +124,11 @@ function logTaskListSearchAllProjectsFallback(search, err) {
 async function getAllTasksAcrossProjects() {
   const projectsResponse = await getAllProjects();
   const projects = Array.isArray(projectsResponse?.data) ? projectsResponse.data : [];
+  const projectTitleById = new Map(
+    projects
+      .filter((project) => Number.isFinite(Number(project?.id)))
+      .map((project) => [Number(project.id), String(project?.title ?? '').trim()])
+  );
 
   const responses = await Promise.all(projects.map((project) => (
     getTasksByProject(project.id, { page: 1 }).catch((err) => {
@@ -145,6 +150,13 @@ async function getAllTasksAcrossProjects() {
     for (const task of tasks) {
       const id = Number(task?.id);
       if (!Number.isFinite(id)) continue;
+
+      const projectId = Number(task?.project_id ?? task?.project?.id);
+      const projectTitle = projectTitleById.get(projectId);
+      if (projectTitle) {
+        task.project_title = projectTitle;
+      }
+
       deduped.set(id, task);
     }
   }
