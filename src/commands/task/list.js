@@ -24,6 +24,10 @@ export const data = new SlashCommandBuilder()
   .addStringOption((opt) =>
     opt.setName('search')
       .setDescription('Search string to filter tasks by title')
+  )
+  .addBooleanOption((opt) =>
+    opt.setName('show-completed')
+      .setDescription('Include completed tasks in the results (default: true)')
   );
 
 /**
@@ -34,6 +38,7 @@ export async function execute(interaction) {
 
   const projectSelection = interaction.options.getString('project');
   const search = interaction.options.getString('search') ?? undefined;
+  const includeCompleted = interaction.options.getBoolean('show-completed') ?? true;
 
   try {
     let res;
@@ -92,17 +97,36 @@ export async function execute(interaction) {
       const needle = normalizeSearch(search);
       tasks = tasks.filter((task) => normalizeSearch(task?.title).includes(needle));
     }
+    tasks = filterTasksByCompletion(tasks, includeCompleted);
+
+    const listTitle = includeCompleted ? title : title + ' (Pending Only)';
 
     if (tasks.length <= TASK_LIST_PAGE_SIZE) {
-      await interaction.editReply({ embeds: [buildTaskListEmbed(tasks, title)] });
+      await interaction.editReply({ embeds: [buildTaskListEmbed(tasks, listTitle)] });
       return;
     }
 
-    await sendPagedTaskListReply(interaction, tasks, title);
+    await sendPagedTaskListReply(interaction, tasks, listTitle);
   } catch (err) {
     const msg = err.response?.data?.message ?? err.message;
     await interaction.editReply({ embeds: [buildErrorEmbed('Failed to list tasks: ' + msg)] });
   }
+}
+
+function filterTasksByCompletion(tasks, includeCompleted) {
+  if (includeCompleted) return tasks;
+  return tasks.filter((task) => !isTaskCompleted(task));
+}
+
+function isTaskCompleted(task) {
+  if (task?.done === true) return true;
+
+  const percentDone = Number(task?.percent_done ?? task?.percentDone);
+  if (Number.isFinite(percentDone) && percentDone >= 1) {
+    return true;
+  }
+
+  return false;
 }
 
 /**
