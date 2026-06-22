@@ -77,7 +77,7 @@ services:
     env_file:
       - .env
     ports:
-      - "3000:3000"
+      - "${WEBHOOK_PORT:-3000}:${WEBHOOK_PORT:-3000}"
     volumes:
       - vikunja-discord-bot-data:/data
 
@@ -88,7 +88,7 @@ volumes:
 Manual run:
 
 ```bash
-docker run --rm -p 3000:3000 -v vikunja-discord-bot-data:/data --env-file /YOUR/FILE/LOCATION/HERE/.env adambeckett1999/vikunja-discord-bot:latest
+docker run --rm -p ${WEBHOOK_PORT:-3000}:${WEBHOOK_PORT:-3000} -v vikunja-discord-bot-data:/data --env-file /YOUR/FILE/LOCATION/HERE/.env adambeckett1999/vikunja-discord-bot:latest
 ```
 
 Once the container is running, the slash commands should register within discord. You may need to check the permissions on your bot within the server.

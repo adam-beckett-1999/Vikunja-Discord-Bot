@@ -11,6 +11,7 @@ import { buildTaskListEmbed, buildErrorEmbed } from '../../utils/embeds.js';
 
 const TASK_LIST_PAGE_SIZE = 10;
 const VIKUNJA_MAX_PER_PAGE = 50;
+const VIKUNJA_MAX_FETCH_PAGES = 20;
 
 export const data = new SlashCommandBuilder()
   .setName('task-list')
@@ -34,9 +35,6 @@ export async function execute(interaction) {
   const projectSelection = interaction.options.getString('project');
   const search = interaction.options.getString('search') ?? undefined;
 
-  const params = { page: 1, per_page: VIKUNJA_MAX_PER_PAGE };
-  if (search) params.s = search;
-
   try {
     let res;
     let title;
@@ -49,37 +47,33 @@ export async function execute(interaction) {
         return;
       }
 
-      res = await getTasksByProject(project.id, params).catch(async (err) => {
+      res = await fetchAllPages(
+        (page) => getTasksByProject(project.id, { page, per_page: VIKUNJA_MAX_PER_PAGE, ...(search ? { s: search } : {}) }),
+      ).catch(async (err) => {
         if (!shouldRetryWithoutServerSearch(err, search)) throw err;
 
         logTaskListSearchFallback('project', search, err);
-        const fallbackParams = { page: 1, per_page: VIKUNJA_MAX_PER_PAGE };
-        return getTasksByProject(project.id, fallbackParams);
+        return fetchAllPages((page) => getTasksByProject(project.id, { page, per_page: VIKUNJA_MAX_PER_PAGE }));
       });
       title = 'Tasks in ' + project.title;
     } else {
-      res = await getAllTasks(params).catch(async (err) => {
+      res = await fetchAllPages(
+        (page) => getAllTasks({ page, per_page: VIKUNJA_MAX_PER_PAGE, ...(search ? { s: search } : {}) }),
+      ).catch(async (err) => {
         if (!search) {
           logTaskListAllProjectsFallback(err);
-          return {
-            data: await getAllTasksAcrossProjects(),
-          };
+          return { data: await getAllTasksAcrossProjects() };
         }
 
         if (!shouldRetryWithoutServerSearch(err, search)) {
           logTaskListSearchAllProjectsFallback(search, err);
-          return {
-            data: await getAllTasksAcrossProjects(),
-          };
+          return { data: await getAllTasksAcrossProjects() };
         }
 
         logTaskListSearchFallback('all', search, err);
-        const fallbackParams = { page: 1, per_page: VIKUNJA_MAX_PER_PAGE };
-        return getAllTasks(fallbackParams).catch(async (fallbackErr) => {
+        return fetchAllPages((page) => getAllTasks({ page, per_page: VIKUNJA_MAX_PER_PAGE })).catch(async (fallbackErr) => {
           logTaskListSearchAllProjectsFallback(search, fallbackErr);
-          return {
-            data: await getAllTasksAcrossProjects(),
-          };
+          return { data: await getAllTasksAcrossProjects() };
         });
       });
       title = search ? 'Tasks containing "' + search + '"' : 'All Tasks';
@@ -101,6 +95,28 @@ export async function execute(interaction) {
     const msg = err.response?.data?.message ?? err.message;
     await interaction.editReply({ embeds: [buildErrorEmbed('Failed to list tasks: ' + msg)] });
   }
+}
+
+/**
+ * Fetch all pages from a Vikunja paginated endpoint.
+ * Calls fetchPage(pageNumber) repeatedly until a page returns fewer items than
+ * VIKUNJA_MAX_PER_PAGE (i.e. the last page) or VIKUNJA_MAX_FETCH_PAGES is reached.
+ * Returns a synthetic response object with a flat `data` array.
+ *
+ * @param {(page: number) => Promise<{data: unknown[]}>} fetchPage
+ * @returns {Promise<{data: unknown[]}>}
+ */
+async function fetchAllPages(fetchPage) {
+  const collected = [];
+
+  for (let page = 1; page <= VIKUNJA_MAX_FETCH_PAGES; page += 1) {
+    const response = await fetchPage(page);
+    const tasks = Array.isArray(response?.data) ? response.data : [];
+    collected.push(...tasks);
+    if (tasks.length < VIKUNJA_MAX_PER_PAGE) break;
+  }
+
+  return { data: collected };
 }
 
 function shouldRetryWithoutServerSearch(err, search) {
@@ -162,7 +178,9 @@ async function getAllTasksAcrossProjects() {
 
   const responses = [];
   for (const project of projects) {
-    const response = await getTasksByProject(project.id, { page: 1, per_page: VIKUNJA_MAX_PER_PAGE }).catch((err) => {
+    const response = await fetchAllPages(
+      (page) => getTasksByProject(project.id, { page, per_page: VIKUNJA_MAX_PER_PAGE }),
+    ).catch((err) => {
       const status = Number(err?.response?.status);
       const message = String(err?.response?.data?.message ?? err?.message ?? 'unknown error');
       console.warn(

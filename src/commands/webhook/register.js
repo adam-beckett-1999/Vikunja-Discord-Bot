@@ -159,5 +159,8 @@ function buildWebhookTargetUrl() {
     parsed.pathname = basePath + '/webhook';
   }
 
+  parsed.search = '';
+  parsed.hash = '';
+
   return parsed.toString();
 }
