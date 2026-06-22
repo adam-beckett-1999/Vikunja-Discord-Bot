@@ -241,6 +241,29 @@ function formatChecklistLine(line) {
   return text ? icon + ' ' + text : icon;
 }
 
+function isRenderedChecklistLine(line) {
+  return /^✅(?:\s|$)|^🔲(?:\s|$)/.test(String(line ?? '').trim());
+}
+
+function collapseChecklistSpacing(lines) {
+  const collapsed = [];
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const current = lines[index];
+    const previous = index > 0 ? lines[index - 1] : '';
+    const next = index + 1 < lines.length ? lines[index + 1] : '';
+
+    const isBlank = String(current ?? '').trim() === '';
+    if (isBlank && isRenderedChecklistLine(previous) && isRenderedChecklistLine(next)) {
+      continue;
+    }
+
+    collapsed.push(current);
+  }
+
+  return collapsed;
+}
+
 export function formatTaskDescription(description) {
   let text = String(description ?? '');
 
@@ -263,9 +286,11 @@ export function formatTaskDescription(description) {
   text = text.replace(/<[^>]+>/g, '');
 
   // Clean up line noise and spacing while preserving paragraph separation.
-  text = text
+  const normalizedLines = text
     .split('\n')
-    .map((line) => formatChecklistLine(line.replace(/\s+/g, ' ').trim()))
+    .map((line) => formatChecklistLine(line.replace(/\s+/g, ' ').trim()));
+
+  text = collapseChecklistSpacing(normalizedLines)
     .join('\n')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
