@@ -128,12 +128,7 @@ export async function upsertWebhookRecord(recordInput) {
     // remaining valid after a webhook is rotated or re-registered.
     store.records = store.records.filter((record) => record.projectId !== projectId);
 
-    const existingIndex = store.records.findIndex((record) => record.webhookId === webhookId);
-    if (existingIndex >= 0) {
-      store.records[existingIndex] = nextRecord;
-    } else {
-      store.records.push(nextRecord);
-    }
+    store.records.push(nextRecord);
 
     await writeStore(store);
     return nextRecord;

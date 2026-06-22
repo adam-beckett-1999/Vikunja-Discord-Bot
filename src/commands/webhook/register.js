@@ -41,6 +41,20 @@ export async function execute(interaction) {
   const projectSelection = interaction.options.getString('project', true);
   const rawEvents = interaction.options.getString('events');
   const selectedChannel = interaction.options.getChannel('channel');
+  const currentChannel = interaction.channel;
+
+  if (!selectedChannel && currentChannel?.type !== ChannelType.GuildText) {
+    await interaction.editReply({
+      embeds: [
+        buildErrorEmbed(
+          'This command was run outside a standard text channel. '
+          + 'Please provide `channel:` explicitly (Guild Text channel only).'
+        ),
+      ],
+    });
+    return;
+  }
+
   const targetChannelId = selectedChannel?.id ?? interaction.channelId;
 
   const requestedHelp = rawEvents?.trim().toLowerCase() === 'help';
