@@ -315,6 +315,20 @@ export function buildProjectListEmbed(projects) {
  * @returns {EmbedBuilder}
  */
 export function buildTaskListEmbed(tasks, title) {
+  return buildTaskListEmbedWithOptions(tasks, title, {});
+}
+
+/**
+ * Build an embed for a list of tasks.
+ * @param {object[]} tasks
+ * @param {string} title
+ * @param {{summaryTasks?: object[], pageInfo?: {currentPage: number, totalPages: number}}} [options]
+ * @returns {EmbedBuilder}
+ */
+export function buildTaskListEmbedWithOptions(tasks, title, options = {}) {
+  const summaryTasks = Array.isArray(options.summaryTasks) ? options.summaryTasks : tasks;
+  const pageInfo = options.pageInfo ?? null;
+
   const embed = new EmbedBuilder()
     .setColor(0x3498db)
     .setTitle(title ?? 'Tasks')
@@ -326,11 +340,11 @@ export function buildTaskListEmbed(tasks, title) {
   }
 
   const now = DateTime.utc();
-  const doneCount = tasks.filter((task) => Boolean(task.done)).length;
-  const pendingCount = tasks.length - doneCount;
-  const overdueCount = tasks.filter((task) => isTaskOverdue(task, now)).length;
+  const doneCount = summaryTasks.filter((task) => Boolean(task.done)).length;
+  const pendingCount = summaryTasks.length - doneCount;
+  const overdueCount = summaryTasks.filter((task) => isTaskOverdue(task, now)).length;
 
-  const projectNames = new Set(tasks.map((task) => getTaskProjectLabel(task)).filter(Boolean));
+  const projectNames = new Set(summaryTasks.map((task) => getTaskProjectLabel(task)).filter(Boolean));
   const hasMultipleProjects = projectNames.size > 1;
 
   const entries = [];
@@ -367,15 +381,24 @@ export function buildTaskListEmbed(tasks, title) {
   embed.addFields({
     name: 'Summary',
     value: [
-      'Total: ' + tasks.length,
+      'Total: ' + summaryTasks.length,
       'Pending: ' + pendingCount,
       'Done: ' + doneCount,
       'Overdue: ' + overdueCount,
     ].join(' | '),
   });
 
-  if (tasks.length > entries.length) {
-    embed.setFooter({ text: 'Showing ' + entries.length + ' of ' + tasks.length + ' tasks.' });
+  const footerParts = [];
+  if (summaryTasks.length > entries.length) {
+    footerParts.push('Showing ' + entries.length + ' of ' + summaryTasks.length + ' tasks.');
+  }
+
+  if (pageInfo?.totalPages && pageInfo.totalPages > 1) {
+    footerParts.push('Page ' + pageInfo.currentPage + '/' + pageInfo.totalPages);
+  }
+
+  if (footerParts.length) {
+    embed.setFooter({ text: footerParts.join(' • ') });
   }
 
   return embed;

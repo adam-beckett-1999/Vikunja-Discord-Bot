@@ -1,7 +1,15 @@
-import { SlashCommandBuilder } from 'discord.js';
+import {
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  ComponentType,
+  SlashCommandBuilder,
+} from 'discord.js';
 import { getAllProjects, getAllTasks, getTasksByProject } from '../../services/vikunja.js';
 import { autocompleteProjects, resolveProjectSelection } from '../../services/vikunja-lookups.js';
 import { buildTaskListEmbed, buildErrorEmbed } from '../../utils/embeds.js';
+
+const TASK_LIST_PAGE_SIZE = 10;
 
 export const data = new SlashCommandBuilder()
   .setName('task-list')
@@ -77,7 +85,12 @@ export async function execute(interaction) {
       tasks = tasks.filter((task) => normalizeSearch(task?.title).includes(needle));
     }
 
-    await interaction.editReply({ embeds: [buildTaskListEmbed(tasks, title)] });
+    if (tasks.length <= TASK_LIST_PAGE_SIZE) {
+      await interaction.editReply({ embeds: [buildTaskListEmbed(tasks, title)] });
+      return;
+    }
+
+    await sendPagedTaskListReply(interaction, tasks, title);
   } catch (err) {
     const msg = err.response?.data?.message ?? err.message;
     await interaction.editReply({ embeds: [buildErrorEmbed('Failed to list tasks: ' + msg)] });
@@ -162,6 +175,70 @@ async function getAllTasksAcrossProjects() {
   }
 
   return [...deduped.values()];
+}
+
+async function sendPagedTaskListReply(interaction, tasks, title) {
+  const pages = chunkTasks(tasks, TASK_LIST_PAGE_SIZE);
+  const pageCount = pages.length;
+  let currentPageIndex = 0;
+
+  await interaction.editReply({
+    embeds: [buildTaskListEmbed(pages[currentPageIndex], title, {
+      summaryTasks: tasks,
+      pageInfo: { currentPage: currentPageIndex + 1, totalPages: pageCount },
+    })],
+    components: [buildTaskListPaginationRow(interaction.id, currentPageIndex, pageCount)],
+  });
+
+  const replyMessage = await interaction.fetchReply();
+  const collector = replyMessage.createMessageComponentCollector({
+    componentType: ComponentType.Button,
+    time: 5 * 60 * 1000,
+    filter: (componentInteraction) => componentInteraction.user.id === interaction.user.id
+      && componentInteraction.customId.startsWith('task-list:' + interaction.id + ':'),
+  });
+
+  collector.on('collect', async (componentInteraction) => {
+    const direction = componentInteraction.customId.endsWith(':next') ? 1 : -1;
+    currentPageIndex = Math.max(0, Math.min(pageCount - 1, currentPageIndex + direction));
+
+    await componentInteraction.update({
+      embeds: [buildTaskListEmbed(pages[currentPageIndex], title, {
+        summaryTasks: tasks,
+        pageInfo: { currentPage: currentPageIndex + 1, totalPages: pageCount },
+      })],
+      components: [buildTaskListPaginationRow(interaction.id, currentPageIndex, pageCount)],
+    });
+  });
+
+  collector.on('end', async () => {
+    await interaction.editReply({
+      components: [buildTaskListPaginationRow(interaction.id, currentPageIndex, pageCount, true)],
+    }).catch(() => {});
+  });
+}
+
+function chunkTasks(tasks, pageSize) {
+  const pages = [];
+  for (let index = 0; index < tasks.length; index += pageSize) {
+    pages.push(tasks.slice(index, index + pageSize));
+  }
+  return pages.length ? pages : [[]];
+}
+
+function buildTaskListPaginationRow(interactionId, currentPageIndex, pageCount, disabled = false) {
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId('task-list:' + interactionId + ':prev')
+      .setLabel('Previous')
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(disabled || currentPageIndex === 0),
+    new ButtonBuilder()
+      .setCustomId('task-list:' + interactionId + ':next')
+      .setLabel('Next')
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(disabled || currentPageIndex >= pageCount - 1)
+  );
 }
 
 export async function autocomplete(interaction) {
