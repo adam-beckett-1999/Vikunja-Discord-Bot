@@ -9,6 +9,7 @@ import { extractTaskReminderInstants } from '../utils/task-reminders.js';
  */
 const vikunjaClient = axios.create({
   baseURL: config.vikunja.baseUrl + '/api/v1',
+  timeout: 15000,
   headers: {
     'Content-Type': 'application/json',
   },

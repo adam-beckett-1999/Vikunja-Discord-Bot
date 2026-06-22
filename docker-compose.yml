@@ -3,6 +3,10 @@ services:
     image: your-dockerhub-username/vikunja-discord-bot:latest
     container_name: vikunja-discord-bot
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     env_file:
       - .env
     ports:

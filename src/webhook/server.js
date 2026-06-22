@@ -64,7 +64,8 @@ export function getWebhookEventType(payload) {
 function isSignatureValid(rawBody, signature, secrets) {
   if (!signature) return false;
   // Strip optional "sha256=" prefix and validate that only hex characters remain.
-  const receivedHex = signature.replace(/^sha256=/, '');
+  const receivedHex = signature.replace(/^sha256=/i, '').trim();
+  if (receivedHex.length !== 64) return false;
   if (!/^[0-9a-f]+$/i.test(receivedHex)) return false;
 
   for (const secret of secrets) {
@@ -87,6 +88,58 @@ function isSignatureValid(rawBody, signature, secrets) {
   return false;
 }
 
+function getHeaderValue(header) {
+  if (Array.isArray(header)) {
+    return String(header[0] ?? '').trim();
+  }
+
+  return String(header ?? '').trim();
+}
+
+function getConfiguredWebhookUrl() {
+  try {
+    const parsed = new URL(String(config.bot.publicUrl ?? '').trim());
+    const basePath = parsed.pathname.replace(/\/+$/, '');
+    parsed.pathname = !basePath || basePath === '/' ? '/webhook' : basePath.endsWith('/webhook') ? basePath : basePath + '/webhook';
+    parsed.search = '';
+    parsed.hash = '';
+    return parsed.toString();
+  } catch {
+    return null;
+  }
+}
+
+function normalizeUrlForCompare(urlValue) {
+  try {
+    const parsed = new URL(String(urlValue ?? '').trim());
+    parsed.pathname = parsed.pathname.replace(/\/+$/, '') || '/';
+    parsed.search = '';
+    parsed.hash = '';
+    return parsed.toString();
+  } catch {
+    return null;
+  }
+}
+
+function resolveSecretsForPayload(payload, webhookRecords) {
+  const configuredWebhookUrl = normalizeUrlForCompare(getConfiguredWebhookUrl());
+  const matchingByUrl = configuredWebhookUrl
+    ? webhookRecords.filter((record) => normalizeUrlForCompare(record.targetUrl) === configuredWebhookUrl)
+    : webhookRecords;
+
+  const candidateRecords = matchingByUrl.length ? matchingByUrl : webhookRecords;
+  const projectId = getProjectIdFromPayload(payload);
+
+  if (projectId !== null) {
+    const projectRecord = candidateRecords.find((record) => Number(record.projectId) === Number(projectId));
+    if (projectRecord?.secret) {
+      return [projectRecord.secret];
+    }
+  }
+
+  return candidateRecords.map((record) => record.secret).filter(Boolean);
+}
+
 /**
  * Create and start the webhook Express server.
  *
@@ -95,11 +148,12 @@ function isSignatureValid(rawBody, signature, secrets) {
  */
 export function startWebhookServer(discordClient) {
   const app = express();
+  app.disable('x-powered-by');
 
   logWebhook('info', 'Webhook server starting on port ' + config.webhook.port);
 
   // Capture raw body for signature verification before JSON parsing.
-  app.use('/webhook', express.raw({ type: 'application/json' }));
+  app.use('/webhook', express.raw({ type: 'application/json', limit: config.webhook.maxBodyKb + 'kb' }));
   app.use('/webhook', (req, res, next) => {
     const startedAt = Date.now();
     res.on('finish', () => {
@@ -109,10 +163,15 @@ export function startWebhookServer(discordClient) {
   });
 
   app.post('/webhook', async (req, res) => {
+    if (!Buffer.isBuffer(req.body)) {
+      logWebhook('warn', 'Rejected request: body was not received as binary payload');
+      return res.status(400).json({ error: 'Invalid request body' });
+    }
+
     const rawBody = req.body.toString('utf8');
-    const signature = req.headers['x-vikunja-signature'];
-    const contentLength = req.headers['content-length'] ?? 'unknown';
-    const contentType = req.headers['content-type'] ?? 'unknown';
+    const signature = getHeaderValue(req.headers['x-vikunja-signature']);
+    const contentLength = getHeaderValue(req.headers['content-length']) || 'unknown';
+    const contentType = getHeaderValue(req.headers['content-type']) || 'unknown';
 
     logWebhook('info', 'Incoming webhook request | contentType=' + contentType + ' | contentLength=' + contentLength + ' | signature=' + (signature ? 'present' : 'missing'));
 
@@ -130,8 +189,14 @@ export function startWebhookServer(discordClient) {
       return res.status(401).json({ error: 'Invalid signature' });
     }
 
-    if (!isSignatureValid(rawBody, signature, webhookRecords.map((record) => record.secret))) {
-      logWebhook('warn', 'Rejected request: invalid signature | recordsAvailable=' + webhookRecords.length + ' | signaturePresent=' + Boolean(signature));
+    const secrets = resolveSecretsForPayload(payload, webhookRecords);
+    if (!secrets.length) {
+      logWebhook('warn', 'Rejected request: no matching webhook secret found for payload | recordsAvailable=' + webhookRecords.length);
+      return res.status(401).json({ error: 'Invalid signature' });
+    }
+
+    if (!isSignatureValid(rawBody, signature, secrets)) {
+      logWebhook('warn', 'Rejected request: invalid signature | matchingSecrets=' + secrets.length + ' | signaturePresent=' + Boolean(signature));
       return res.status(401).json({ error: 'Invalid signature' });
     }
 
@@ -152,12 +217,46 @@ export function startWebhookServer(discordClient) {
     });
   });
 
+  app.use('/webhook', (err, _req, res, _next) => {
+    const status = getHttpErrorStatus(err);
+    const message = getHttpErrorMessage(err);
+
+    logWebhook('warn', 'Rejected request: ' + message + ' | status=' + status);
+    res.status(status).json({ error: message });
+  });
+
   const port = config.webhook.port;
   app.listen(port, () => {
     logWebhook('info', 'Listening on port ' + port);
   });
 
   return app;
+}
+
+function isPayloadTooLargeError(err) {
+  return err?.type === 'entity.too.large' || Number(err?.status) === 413;
+}
+
+function isInvalidJsonError(err) {
+  return err?.type === 'entity.parse.failed' || err instanceof SyntaxError;
+}
+
+function getHttpErrorStatus(err) {
+  if (isPayloadTooLargeError(err)) return 413;
+  if (isInvalidJsonError(err)) return 400;
+  return 500;
+}
+
+function getHttpErrorMessage(err) {
+  if (isPayloadTooLargeError(err)) {
+    return 'Payload too large. Increase WEBHOOK_MAX_BODY_KB if needed.';
+  }
+
+  if (isInvalidJsonError(err)) {
+    return 'Invalid JSON';
+  }
+
+  return 'Webhook server error';
 }
 
 /**

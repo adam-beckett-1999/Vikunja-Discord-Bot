@@ -69,11 +69,11 @@ async function readStore() {
 }
 
 async function writeStore(nextStore) {
-  await mkdir(DATA_DIR, { recursive: true });
+  await mkdir(DATA_DIR, { recursive: true, mode: 0o700 });
 
   const tempPath = STORE_PATH + '.tmp';
   const json = JSON.stringify(nextStore, null, 2) + '\n';
-  await writeFile(tempPath, json, 'utf8');
+  await writeFile(tempPath, json, { encoding: 'utf8', mode: 0o600 });
   await rename(tempPath, STORE_PATH);
 }
 

@@ -9,20 +9,30 @@ function requireEnv(name) {
   return value;
 }
 
+function parsePositiveInt(value, fallback) {
+  const parsed = Number.parseInt(String(value ?? ''), 10);
+  if (Number.isFinite(parsed) && parsed > 0) {
+    return parsed;
+  }
+
+  return fallback;
+}
+
 export default {
   bot: {
     timeZone: requireEnv('TZ'),
     publicUrl: requireEnv('BOT_PUBLIC_URL'),
   },
   discord: {
-    token: process.env.DISCORD_TOKEN,
-    clientId: process.env.DISCORD_CLIENT_ID,
+    token: requireEnv('DISCORD_TOKEN'),
+    clientId: requireEnv('DISCORD_CLIENT_ID'),
   },
   vikunja: {
-    baseUrl: process.env.VIKUNJA_BASE_URL?.replace(/\/$/, ''),
-    apiToken: process.env.VIKUNJA_API_TOKEN,
+    baseUrl: requireEnv('VIKUNJA_BASE_URL').replace(/\/$/, ''),
+    apiToken: requireEnv('VIKUNJA_API_TOKEN'),
   },
   webhook: {
-    port: parseInt(process.env.WEBHOOK_PORT ?? '3000', 10),
+    port: parsePositiveInt(process.env.WEBHOOK_PORT, 3000),
+    maxBodyKb: parsePositiveInt(process.env.WEBHOOK_MAX_BODY_KB, 256),
   },
 };

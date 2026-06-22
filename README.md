@@ -53,6 +53,7 @@ Set these in `.env` in the same folder as your compose file, or ensure you inclu
 |---|---|---|
 | `TZ` | Yes | Bot timezone |
 | `WEBHOOK_PORT` | No | Webhook port (default `3000`) |
+| `WEBHOOK_MAX_BODY_KB` | No | Max webhook request body size in KB (default `256`) |
 | `BOT_PUBLIC_URL` | Yes | Public base URL for the bot |
 | `DISCORD_TOKEN` | Yes | Bot token |
 | `DISCORD_CLIENT_ID` | Yes | Application client ID |
@@ -69,15 +70,19 @@ services:
     image: adambeckett1999/vikunja-discord-bot:latest
     container_name: vikunja-discord-bot
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     env_file:
       - .env
     ports:
       - "3000:3000"
-   volumes:
+    volumes:
       - vikunja-discord-bot-data:/data
 
 volumes:
-   vikunja-discord-bot-data:
+  vikunja-discord-bot-data:
 ```
 
 Manual run:
@@ -209,6 +214,18 @@ Use dedicated commands to change task completion status:
 ## Webhook Security
 
 When you register a webhook through `/webhook-register`, the bot generates a secret, stores it in `/data/webhook-records.json`, and uses that record to verify the `X-Vikunja-Signature` HMAC-SHA256 header on incoming webhook requests.
+
+Additional hardening applied by default:
+
+- Incoming webhook payloads are size-limited (`WEBHOOK_MAX_BODY_KB`, default `256`).
+- Signature verification is scoped to the matching project webhook record whenever possible.
+- Local data stores under `/data` are written with restricted permissions.
+
+Recommended operational hardening:
+
+- Restrict network access so only Vikunja (or your reverse proxy) can reach the webhook endpoint.
+- Terminate TLS at a reverse proxy and keep `BOT_PUBLIC_URL` on HTTPS.
+- Rotate Vikunja API tokens and Discord bot tokens if access to `.env` is ever exposed.
 
 ---
 
