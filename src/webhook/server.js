@@ -498,10 +498,6 @@ async function buildSpecialWebhookNotification(eventType, payload, taskFromPaylo
       embed.addFields({ name: 'Author', value: author, inline: true });
     }
 
-    if (comment?.id !== undefined) {
-      embed.addFields({ name: 'Comment ID', value: String(comment.id), inline: true });
-    }
-
     return {
       embed,
       taskForOpenButton: task,
@@ -567,7 +563,6 @@ async function buildSpecialWebhookNotification(eventType, payload, taskFromPaylo
 
     const action = kind.endsWith('.created') ? 'Relation Added' : 'Relation Removed';
     const embed = buildTaskEventEmbed(task, action, WEBHOOK_EVENT_COLOURS.info, projectName, payload?.time);
-    embed.setDescription('Task relations were updated.');
 
     const relationKind = pickString([
       relation?.relation_kind,
@@ -575,13 +570,17 @@ async function buildSpecialWebhookNotification(eventType, payload, taskFromPaylo
       relation?.relation,
       relation?.type,
     ]);
-    if (relationKind) {
-      embed.addFields({ name: 'Relation', value: relationKind, inline: true });
-    }
 
-    const relatedTaskId = relation?.other_task_id ?? relation?.otherTaskId ?? relation?.task_id;
-    if (relatedTaskId !== undefined) {
-      embed.addFields({ name: 'Related Task ID', value: String(relatedTaskId), inline: true });
+    const relatedTask = await resolveRelatedTaskForRelation(relation, payload);
+    const relatedTaskTitle = relatedTask?.title
+      ? String(relatedTask.title)
+      : null;
+
+    const relationView = formatRelationDescription(relationKind, relatedTaskTitle, kind);
+    embed.setDescription(relationView.description);
+
+    if (relationKind) {
+      embed.addFields({ name: 'Relation', value: relationView.label, inline: true });
     }
 
     return {
@@ -790,6 +789,89 @@ function extractRelationEntity(payload) {
       || value.other_task_id !== undefined
       || value.otherTaskId !== undefined;
   });
+}
+
+async function resolveRelatedTaskForRelation(relation, payload) {
+  const inlineTask = findFirstObject([
+    relation?.other_task,
+    relation?.otherTask,
+    relation?.related_task,
+    relation?.relatedTask,
+    payload?.data?.other_task,
+    payload?.data?.otherTask,
+    payload?.data?.related_task,
+    payload?.data?.relatedTask,
+  ], (value) => value?.id !== undefined || typeof value?.title === 'string');
+
+  if (inlineTask) {
+    return inlineTask;
+  }
+
+  const relatedTaskId = Number(
+    relation?.other_task_id
+    ?? relation?.otherTaskId
+    ?? relation?.related_task_id
+    ?? relation?.relatedTaskId
+    ?? payload?.data?.other_task_id
+    ?? payload?.data?.otherTaskId
+  );
+
+  if (!Number.isFinite(relatedTaskId)) {
+    return null;
+  }
+
+  return getTask(relatedTaskId)
+    .then((res) => res.data)
+    .catch(() => ({ id: relatedTaskId, title: 'Task #' + relatedTaskId }));
+}
+
+function formatRelationDescription(relationKind, relatedTaskTitle, eventKind) {
+  const normalized = normalizeRelationKind(relationKind);
+  const relationLabel = formatRelationKindLabel(normalized);
+  const target = relatedTaskTitle ? '**' + relatedTaskTitle + '**' : 'another task';
+  const removed = String(eventKind ?? '').toLowerCase().endsWith('.deleted');
+  const verb = removed ? 'removed' : 'added';
+
+  const templates = {
+    subtask: 'This task ' + verb + ' a subtask relation with ' + target + '.',
+    parenttask: 'This task ' + verb + ' a parent relation with ' + target + '.',
+    relatedtask: 'This task is related to ' + target + ' (' + verb + ').',
+    duplicates: 'This task now marks ' + target + ' as duplicate-related (' + verb + ').',
+    blocking: 'This task blocks ' + target + ' (' + verb + ').',
+    blockedby: 'This task is blocked by ' + target + ' (' + verb + ').',
+    precedes: 'This task precedes ' + target + ' (' + verb + ').',
+    follows: 'This task follows ' + target + ' (' + verb + ').',
+    copiedfrom: 'This task was linked as copied from ' + target + ' (' + verb + ').',
+    copiedto: 'This task was linked as copied to ' + target + ' (' + verb + ').',
+  };
+
+  return {
+    label: relationLabel,
+    description: templates[normalized] ?? ('Task relation ' + verb + ' with ' + target + '.'),
+  };
+}
+
+function normalizeRelationKind(relationKind) {
+  return String(relationKind ?? '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '');
+}
+
+function formatRelationKindLabel(normalizedKind) {
+  const labels = {
+    subtask: 'Subtask',
+    parenttask: 'Parent Task',
+    relatedtask: 'Related Task',
+    duplicates: 'Duplicates',
+    blocking: 'Blocking',
+    blockedby: 'Blocked By',
+    precedes: 'Precedes',
+    follows: 'Follows',
+    copiedfrom: 'Copied From',
+    copiedto: 'Copied To',
+  };
+
+  return labels[normalizedKind] ?? 'Related';
 }
 
 function extractProjectEntity(payload) {
