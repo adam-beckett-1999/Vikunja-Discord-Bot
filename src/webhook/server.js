@@ -402,6 +402,22 @@ async function postNotification(discordClient, eventType, payload) {
 }
 
 async function resolveNotificationChannelId(payload, task, eventType) {
+  // For project.* events, payload.data is the project object itself.
+  // Extract the project ID directly to avoid getTaskIdFromPayload picking up
+  // payload.data.id (which is a project ID) and firing a spurious /tasks/:id fetch.
+  const isProjectEvent = String(eventType ?? '').toLowerCase().startsWith('project.');
+  if (isProjectEvent) {
+    const projectEntity = extractProjectEntity(payload);
+    const projectEntityId = projectEntity?.id !== undefined ? Number(projectEntity.id) : null;
+    if (projectEntityId !== null && Number.isFinite(projectEntityId)) {
+      const mappedChannelId = await getChannelIdForProject(projectEntityId).catch(() => null);
+      if (mappedChannelId) {
+        return mappedChannelId;
+      }
+    }
+    return null;
+  }
+
   const projectId = getProjectIdFromPayload(payload);
 
   if (projectId !== null) {
