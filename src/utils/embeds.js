@@ -228,6 +228,19 @@ function decodeHtmlEntities(input) {
     .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code)));
 }
 
+function formatChecklistLine(line) {
+  const checklistMatch = line.match(/^\s*(?:(?:[-*+]|\d+\.)\s+)?\[(x|X| )\]\s*(.*)$/);
+  if (!checklistMatch) {
+    return line;
+  }
+
+  const isChecked = checklistMatch[1].toLowerCase() === 'x';
+  const text = checklistMatch[2].trim();
+  const icon = isChecked ? '✅' : '🔲';
+
+  return text ? icon + ' ' + text : icon;
+}
+
 export function formatTaskDescription(description) {
   let text = String(description ?? '');
 
@@ -252,7 +265,7 @@ export function formatTaskDescription(description) {
   // Clean up line noise and spacing while preserving paragraph separation.
   text = text
     .split('\n')
-    .map((line) => line.replace(/\s+/g, ' ').trimEnd())
+    .map((line) => formatChecklistLine(line.replace(/\s+/g, ' ').trim()))
     .join('\n')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
