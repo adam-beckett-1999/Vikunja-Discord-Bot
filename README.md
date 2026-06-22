@@ -14,7 +14,7 @@ Self-hosted Discord bot for Vikunja.
 - `/alert-assignee` lets you manage who gets pinged for reminder alerts (`link`, `unlink`, `list`).
 - Vikunja sends events to the bot webhook endpoint.
 - The bot posts those events to the mapped Discord channel for the matching project.
-- Task embeds include an `Open` link button for the relevant Vikunja page.
+- Webhook-delivered task embeds include an `Open` link button for the relevant Vikunja page.
 - The bot verifies incoming webhook signatures using per-webhook secrets stored in `/data`.
 
 ## What you need
@@ -196,7 +196,7 @@ Use `/task-reminder` to work with task reminder dates directly:
 ```
 
 `add` expects a date and time in `YYYY-MM-DD HH:mm` format, using a 24-hour clock in the bot's configured timezone.
-Set `TZ` to change that timezone (default `UTC`).
+Set `TZ` to a valid IANA timezone (for example `UTC`) to control that timezone.
 For example: `2026-06-21 18:00`.
 `remove` supports autocomplete for reminder selection.
 

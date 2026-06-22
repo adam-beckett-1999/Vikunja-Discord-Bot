@@ -1,4 +1,5 @@
 const MAX_ASSIGNEE_CHOICE_NAME_LENGTH = 100;
+const MAX_ASSIGNEE_CHOICE_VALUE_LENGTH = 100;
 const MAX_ASSIGNEE_LIST_LENGTH = 120;
 const MAX_ASSIGNEE_FIELD_LENGTH = 1024;
 
@@ -73,15 +74,39 @@ export function toAssigneeSelectionValue(assignee) {
 
   const username = normalizeComparable(assignee?.username);
   if (username) {
-    return 'username:' + username;
+    return buildBoundedSelectionValue('username:', username);
   }
 
   const displayName = normalizeComparable(assignee?.displayName);
   if (displayName) {
-    return 'name:' + displayName;
+    return buildBoundedSelectionValue('name:', displayName);
   }
 
   return '';
+}
+
+function buildBoundedSelectionValue(prefix, normalizedValue) {
+  const raw = prefix + normalizedValue;
+  if (raw.length <= MAX_ASSIGNEE_CHOICE_VALUE_LENGTH) {
+    return raw;
+  }
+
+  const hash = stableHash(normalizedValue);
+  const separator = ':';
+  const maxPrefixLen = MAX_ASSIGNEE_CHOICE_VALUE_LENGTH - prefix.length - separator.length - hash.length;
+  const boundedValue = normalizedValue.slice(0, Math.max(1, maxPrefixLen));
+  return prefix + boundedValue + separator + hash;
+}
+
+function stableHash(value) {
+  let hash = 0;
+  const text = String(value ?? '');
+
+  for (let i = 0; i < text.length; i += 1) {
+    hash = ((hash * 31) + text.charCodeAt(i)) >>> 0;
+  }
+
+  return hash.toString(36);
 }
 
 export function formatAssigneeNameList(names, maxLength = MAX_ASSIGNEE_LIST_LENGTH) {
