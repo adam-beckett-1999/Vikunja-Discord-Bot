@@ -4,6 +4,13 @@ on:
   push:
     branches-ignore:
       - release
+    paths:
+      - Dockerfile
+      - .dockerignore
+      - package.json
+      - package-lock.json
+      - deploy-commands.js
+      - src/**
   workflow_dispatch:
 
 permissions:

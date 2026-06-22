@@ -4,6 +4,13 @@ name: Build and Push Docker Image (Release Branch)
   push:
     branches:
       - release
+    paths:
+      - Dockerfile
+      - .dockerignore
+      - package.json
+      - package-lock.json
+      - deploy-commands.js
+      - src/**
 
 permissions:
   contents: read
